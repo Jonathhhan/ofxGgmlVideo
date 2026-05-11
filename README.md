@@ -15,12 +15,13 @@ Family map: https://jonathhhan.github.io/ofxGgmlCore/
 
 ## Example
 
-`ofxGgmlVideoFrameExample` is a root-level video request smoke test. Generate it with the openFrameworks projectGenerator using addons `ofxGgmlVideo` and `ofxGgmlCore`.
+`ofxGgmlVideoFrameExample` is a root-level video request smoke test. Generate it with the openFrameworks projectGenerator using addons `ofxGgmlVideo`, `ofxGgmlCore`, and `ofxImGui`.
 
 ## Dependencies
 
 - openFrameworks
 - `ofxGgmlCore`
+- `ofxImGui` for examples
 
 ## Validate
 
