@@ -1,6 +1,9 @@
 # ofxGgmlVideo
 
-`ofxGgmlVideo` is the companion addon for video understanding, frame pipelines, temporal analysis, and video generation workflows on top of `ofxGgmlCore`.
+`ofxGgmlVideo` is the companion addon for video understanding, frame pipelines,
+temporal analysis, and video generation workflows on top of `ofxGgmlCore`.
+Temporal GANs, image-to-video generators, and other sequence generators belong
+here when the output is frames or video.
 
 `ofxGgmlCore` stays the dependency. This addon owns video-specific workflow code so core can stay small and boring.
 
@@ -37,4 +40,7 @@ On macOS/Linux:
 
 ## Boundary
 
-Keep video-specific decoding, frame sampling, temporal preprocessing and postprocessing, model launch, media handling, and examples here. Move code down into `ofxGgmlCore` only when it becomes a stable, domain-neutral primitive with focused tests.
+Keep video-specific decoding, frame sampling, temporal preprocessing and
+postprocessing, model launch, media handling, sequence-generation backends, and
+examples here. Move code down into `ofxGgmlCore` only when it becomes a stable,
+domain-neutral primitive with focused tests.

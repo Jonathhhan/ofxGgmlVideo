@@ -16,6 +16,7 @@ No dependency should point from `ofxGgmlCore` back to `ofxGgmlVideo`.
 
 - video-specific request/result helpers
 - frame sampling and temporal preprocessing boundaries
+- temporal GAN and sequence-generation backend boundaries
 - model-specific video postprocessing
 - focused root-level examples
 - local media/model workflow documentation
@@ -25,3 +26,10 @@ No dependency should point from `ofxGgmlCore` back to `ofxGgmlVideo`.
 - ggml runtime setup and backend selection
 - generic tensor, graph, model metadata, and result types
 - unrelated companion workflows
+
+## GAN Video Generation
+
+GAN work that produces frame sequences, motion, image-to-video output, or video
+restoration belongs here. Reuse `ofxGgmlDiffusion` only when the workflow is
+really image-first; keep temporal state, frame scheduling, media IO, and video
+result handling in this addon.
