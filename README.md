@@ -9,6 +9,8 @@ here when the output is frames or video.
 
 Family map: https://jonathhhan.github.io/ofxGgmlCore/
 
+Current addon API version: `1.0.1`.
+
 ## First Milestone
 
 - define small request/result types
