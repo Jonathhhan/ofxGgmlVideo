@@ -1,0 +1,25 @@
+{
+  "name": "ofxGgmlVideo",
+  "lane": "video",
+  "coreBaseline": "v1.0.1",
+  "requires": [
+    "ofxGgmlCore"
+  ],
+  "owns": [
+    "video understanding",
+    "frame pipelines",
+    "temporal analysis",
+    "video generation"
+  ],
+  "platforms": [
+    "windows",
+    "macos",
+    "linux"
+  ],
+  "backends": [
+    "cpu",
+    "cuda",
+    "metal",
+    "vulkan"
+  ]
+}
