@@ -1,29 +1,32 @@
-# AGENTS.md
+# Codex Repository Instructions
 
-This repository is `ofxGgmlVideo`, the video companion addon for the ofxGgml family.
+This repository is part of the ofxGgml openFrameworks addon ecosystem.
 
-Codex should treat `ofxGgmlCore` as the backend-neutral foundation. This repo owns video understanding, frame pipelines, temporal analysis, video generation workflows, and video-specific examples.
+## Addon Scope
 
-## Addon contract
+- Addon: ofxGgmlVideo
+- Lane: video pipelines
+- Role: video frame requests, temporal analysis, and video generation boundaries
 
-Do:
+## Working Rules
 
-- keep video-specific workflows in this addon
-- depend on shared primitives from `ofxGgmlCore`
-- preserve openFrameworks addon layout and `addon_config.mk`
-- keep examples projectGenerator-friendly
-- document runtime/model/video requirements clearly
+- Read the existing code and docs before changing behavior.
+- Keep edits scoped to this addon's lane and preserve the companion-addon split.
+- Start with an ecosystem plan when a task asks for cross-repo improvement or planning.
+- Keep ofxGgmlCore as the shared base; do not add reverse dependencies from Core to companion addons.
+- Do not commit generated project files, binaries, model weights, downloaded runtimes, sample media dumps, memory indexes, or caches.
+- Prefer focused tests and local validation over broad refactors.
+- Preserve openFrameworks-style public names and document intentional breaking changes.
 
-Do not:
+## Validation
 
-- move backend-neutral Core primitives into this repo
-- commit generated videos, frames, binaries, or caches
-- hardcode local absolute paths
+Validation before handoff: scripts\validate-local.ps1.
 
-## Codex workflow
+For ecosystem planning work, run scripts\plan-ecosystem.ps1 from ofxGgmlCore
+before proposing addon-code changes.
 
-1. Inspect existing files first.
-2. Keep changes small and focused.
-3. Preserve addon boundaries.
-4. Update docs/examples/scripts with code changes.
-5. Summarize validation honestly.
+## Ecosystem Notes
+
+Model-specific UX belongs in companion addons. Shared code should move down into
+ofxGgmlCore only after it is stable, domain-neutral, dependency-light, and
+covered by focused tests.
