@@ -31,12 +31,14 @@ Current addon API version: `1.0.1`.
 ## Validate
 
 ```powershell
+scripts\doctor-video.bat
 scripts\validate-local.bat
 ```
 
 On macOS/Linux:
 
 ```sh
+./scripts/doctor-video.sh
 ./scripts/validate-local.sh
 ```
 
