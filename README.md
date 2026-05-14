@@ -22,6 +22,9 @@ Current addon API version: `1.0.1`.
 
 `ofxGgmlVideoFrameExample` is a root-level video request smoke test. Generate it with the openFrameworks projectGenerator using addons `ofxGgmlVideo`, `ofxGgmlCore`, and `ofxImGui`.
 
+For video-lane planning, temporal boundaries, and generated media rules, see
+[docs/VIDEO_WORKFLOWS.md](docs/VIDEO_WORKFLOWS.md).
+
 ## Dependencies
 
 - openFrameworks
