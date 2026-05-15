@@ -74,6 +74,10 @@ Assert-Path (Join-Path $scriptRoot "doctor-video.ps1") "Video doctor script"
 Assert-Path (Join-Path $scriptRoot "doctor-video.bat") "Video doctor Windows wrapper"
 Assert-Path (Join-Path $scriptRoot "doctor-video.sh") "Video doctor shell wrapper"
 Assert-Path (Join-Path $scriptRoot "test-doctor-video.ps1") "Video doctor smoke test"
+Assert-Path (Join-Path $scriptRoot "run-video-runtime-smoke.ps1") "Video runtime smoke script"
+Assert-Path (Join-Path $scriptRoot "run-video-runtime-smoke.bat") "Video runtime smoke Windows wrapper"
+Assert-Path (Join-Path $scriptRoot "run-video-runtime-smoke.sh") "Video runtime smoke shell wrapper"
+Assert-Path (Join-Path $scriptRoot "test-video-runtime-smoke.ps1") "Video runtime smoke contract test"
 
 $nestedExamples = Join-Path $addonRoot "examples"
 if (Test-Path -LiteralPath $nestedExamples -PathType Container) {
@@ -102,6 +106,9 @@ Write-Step "Checking Video doctor"
 if (!$?) {
 	throw "Video doctor smoke test failed"
 }
+
+Write-Step "Checking Video runtime smoke contract"
+& (Join-Path $scriptRoot "test-video-runtime-smoke.ps1")
 
 Write-Step "Running headless tests"
 & (Join-Path $scriptRoot "test-addon.ps1")
