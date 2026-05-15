@@ -64,7 +64,14 @@ Use the smallest command that proves the changed layer:
 | Docs or planning only | `scripts\validate-local.bat` |
 | Local setup diagnosis | `scripts\doctor-video.bat` |
 | Request/result/helper changes | `scripts\test-addon.bat` |
+| Ecosystem runtime smoke evidence | `scripts\run-video-runtime-smoke.bat -Json -SummaryOnly` |
 | Example layout changes | `scripts\validate-local.bat` |
+
+`scripts\run-video-runtime-smoke.*` is intentionally request-boundary-only
+until this addon owns a real local video backend. It compiles and runs the
+deterministic helper tests, checks doctor readiness, and emits JSON for Core
+planning without downloading models, requiring video media, extracting frame
+caches, or committing generated videos.
 
 ## Safe first tasks
 

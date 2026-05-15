@@ -35,6 +35,7 @@ For video-lane planning, temporal boundaries, and generated media rules, see
 
 ```powershell
 scripts\doctor-video.bat
+scripts\run-video-runtime-smoke.bat -Json -SummaryOnly
 scripts\validate-local.bat
 ```
 
@@ -42,8 +43,17 @@ On macOS/Linux:
 
 ```sh
 ./scripts/doctor-video.sh
+./scripts/run-video-runtime-smoke.sh -Json -SummaryOnly
 ./scripts/validate-local.sh
 ```
+
+`scripts\run-video-runtime-smoke.*` is the lane-owned runtime-smoke entrypoint
+for ecosystem planning and CI rollouts. It currently proves the deterministic
+video request/helper boundary and doctor readiness without claiming
+model-backed video understanding, temporal analysis, image-to-video, or
+sequence-generation inference. Add model-backed checks here only after the
+local backend, model paths, input media, generated frame/video outputs, and
+cleanup contract are explicit.
 
 ## Boundary
 
