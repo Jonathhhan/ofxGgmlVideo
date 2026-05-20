@@ -11,6 +11,13 @@
     "temporal analysis",
     "video generation"
   ],
+  "features": [
+    "frame pipeline workflow boundary",
+    "temporal analysis lane",
+    "video understanding requests",
+    "video generation boundary planning",
+    "runtime smoke validation entrypoint"
+  ],
   "platforms": [
     "windows",
     "macos",
