@@ -11,6 +11,14 @@ Family map: https://jonathhhan.github.io/ofxGgmlCore/
 
 Current addon API version: `1.0.1`.
 
+## Features
+
+- frame pipeline workflow boundary
+- temporal analysis lane
+- video understanding requests
+- video generation boundary planning
+- runtime smoke validation entrypoint
+
 ## First Milestone
 
 - define small request/result types
