@@ -28,10 +28,14 @@ For normal development:
 
 ## Runtime Scope
 
-Video understanding, temporal analysis, frame pipelines, image-to-video, and
-sequence-generation adapters should be explicit about their local runtime and
-model requirements when they land. Skeleton releases must say clearly when no
-model-backed runtime is included.
+Video montage planning, clip timelines, temporal analysis, frame pipelines, and
+video-to-agent handoff adapters should be explicit about their local runtime
+and model requirements when they land. Skeleton releases must say clearly when
+no model-backed runtime is included.
+
+Agentic edit decisions belong in `ofxGgmlAgents` or the app layer. CLIP model
+ownership belongs in `ofxGgmlVision`. Stable Diffusion, diffusion-backed
+image-to-video, and image-first generation belong in the diffusion addons.
 
 Generated models, media outputs, and build outputs stay out of git.
 

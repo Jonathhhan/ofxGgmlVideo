@@ -96,7 +96,7 @@ $checks += Test-PathCheck `
 $checks += Test-PathCheck `
 	-Path (Join-Path $addonsRoot "ofxImGui") `
 	-Name "ofxImGui" `
-	-MissingDetail "install beside ofxGgmlVideo before building the frame example" `
+	-MissingDetail "install beside ofxGgmlVideo before building the examples" `
 	-Directory
 
 $checks += Test-PathCheck `
@@ -108,6 +108,16 @@ $checks += Test-PathCheck `
 	-Path (Join-Path $addonRoot "ofxGgmlVideoFrameExample\src\ofApp.cpp") `
 	-Name "frame example source" `
 	-MissingDetail "frame example source is missing"
+
+$checks += Test-PathCheck `
+	-Path (Join-Path $addonRoot "ofxGgmlVideoMontageExample\addons.make") `
+	-Name "montage example" `
+	-MissingDetail "ofxGgmlVideoMontageExample skeleton is missing"
+
+$checks += Test-PathCheck `
+	-Path (Join-Path $addonRoot "ofxGgmlVideoMontageExample\src\ofApp.cpp") `
+	-Name "montage example source" `
+	-MissingDetail "montage example source is missing"
 
 $checks += Test-PathCheck `
 	-Path (Join-Path $addonRoot "src\ofxGgmlVideo\ofxGgmlVideoTypes.h") `
@@ -136,6 +146,9 @@ foreach ($relative in @(
 	"ofxGgmlVideoFrameExample\bin",
 	"ofxGgmlVideoFrameExample\obj",
 	"ofxGgmlVideoFrameExample\.vs",
+	"ofxGgmlVideoMontageExample\bin",
+	"ofxGgmlVideoMontageExample\obj",
+	"ofxGgmlVideoMontageExample\.vs",
 	"models"
 )) {
 	$warning = Test-ForbiddenPath -RelativePath $relative

@@ -54,9 +54,13 @@ macOS/Linux:
 `ofxGgmlVideoFrameExample` is intentionally narrow in this release:
 
 - root-level openFrameworks example
+- root-level montage workflow example
 - `ofxImGui` dependency declared in `addons.make`
-- video/frame request smoke surface
-- clear future path for temporal analysis and video generation adapters
+- montage and video clip/frame request smoke surface
+- deterministic clip-window frame sampling helpers
+- deterministic montage timeline helpers
+- deterministic edit-decision-list handoff helper
+- clear future path for temporal analysis and agent/CLIP/vision handoff adapters
 
 This release does not promise a complete model-backed video runtime.
 

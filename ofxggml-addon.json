@@ -6,16 +6,18 @@
     "ofxGgmlCore"
   ],
   "owns": [
-    "video understanding",
+    "video montage workflows",
+    "edit-decision timeline planning",
     "frame pipelines",
     "temporal analysis",
-    "video generation"
+    "video-to-agent handoff"
   ],
   "features": [
     "frame pipeline workflow boundary",
-    "temporal analysis lane",
-    "video understanding requests",
-    "video generation boundary planning",
+    "montage and video clip request boundary",
+    "deterministic montage plan helpers",
+    "temporal frame sampling",
+    "agent and CLIP-style scoring handoff planning",
     "runtime smoke validation entrypoint"
   ],
   "platforms": [

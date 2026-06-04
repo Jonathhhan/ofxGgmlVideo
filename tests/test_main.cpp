@@ -30,5 +30,78 @@ int main() {
 		return 1;
 	}
 
+	request.prompt = "find motion beats";
+	request.temporalWindow.startSeconds = 1.0;
+	request.temporalWindow.durationSeconds = 2.0;
+	request.temporalWindow.sampleRateFps = 2.0;
+	request.temporalWindow.maxFrames = 3;
+
+	if (!ofxGgmlVideoUtils::hasTemporalWindow(request)) {
+		std::cerr << "valid clip window reported as invalid\n";
+		return 1;
+	}
+
+	const auto samples = ofxGgmlVideoUtils::planFrameSamples(request.temporalWindow);
+	if (samples.size() != 3 ||
+		samples[0].reference != "frame@1.000s" ||
+		samples[1].reference != "frame@1.500s" ||
+		samples[2].reference != "frame@2.000s") {
+		std::cerr << "unexpected deterministic sample plan\n";
+		return 1;
+	}
+
+	const auto clipPlan = ofxGgmlVideoUtils::planClip(request);
+	if (!clipPlan ||
+		clipPlan.frameSamples.size() != samples.size() ||
+		clipPlan.references.size() != samples.size() ||
+		clipPlan.text.find("clip plan") == std::string::npos ||
+		clipPlan.text.find(request.prompt) == std::string::npos) {
+		std::cerr << "clip plan did not include expected sample metadata\n";
+		return 1;
+	}
+
+	ofxGgmlVideoRequest invalidWindowRequest;
+	invalidWindowRequest.videoPath = request.videoPath;
+	invalidWindowRequest.temporalWindow.durationSeconds = -1.0;
+	if (ofxGgmlVideoUtils::planClip(invalidWindowRequest)) {
+		std::cerr << "invalid clip window produced a successful plan\n";
+		return 1;
+	}
+
+	ofxGgmlVideoRequest cutaway;
+	cutaway.videoPath = "videos/cutaway.mp4";
+	cutaway.prompt = "reaction shot";
+	cutaway.tags = {"reaction", "closeup"};
+	cutaway.temporalWindow.startSeconds = 4.0;
+	cutaway.temporalWindow.durationSeconds = 1.0;
+	cutaway.temporalWindow.sampleRateFps = 1.0;
+
+	const auto montage = ofxGgmlVideoUtils::planMontage({request, cutaway}, "montageautomat draft");
+	if (!montage ||
+		montage.segments.size() != 2 ||
+		montage.durationSeconds != 3.0 ||
+		montage.segments[0].timelineStartSeconds != 0.0 ||
+		montage.segments[1].timelineStartSeconds != 2.0 ||
+		montage.references.empty() ||
+		montage.references[0].find("videos/clip.mp4#frame@1.000s") == std::string::npos ||
+		ofxGgmlVideoUtils::describe(montage).find("segments=2") == std::string::npos) {
+		std::cerr << "montage plan did not include expected timeline metadata\n";
+		return 1;
+	}
+
+	const auto edl = ofxGgmlVideoUtils::toMontageEdl(montage);
+	if (edl.find("TITLE montageautomat draft") == std::string::npos ||
+		edl.find("SEGMENT 000 TL 0.000s +2.000s SRC videos/clip.mp4 @1.000s") == std::string::npos ||
+		edl.find("TAGS reaction,closeup") == std::string::npos ||
+		edl.find("REF videos/clip.mp4#frame@1.000s") == std::string::npos) {
+		std::cerr << "montage EDL did not include expected edit decisions\n";
+		return 1;
+	}
+
+	if (ofxGgmlVideoUtils::planMontage({})) {
+		std::cerr << "empty montage produced a successful plan\n";
+		return 1;
+	}
+
 	return 0;
 }

@@ -3,10 +3,24 @@
 #include <string>
 #include <vector>
 
+struct ofxGgmlVideoTemporalWindow {
+	double startSeconds = 0.0;
+	double durationSeconds = 0.0;
+	double sampleRateFps = 1.0;
+	int maxFrames = 0;
+};
+
+struct ofxGgmlVideoFrameSample {
+	int index = 0;
+	double timeSeconds = 0.0;
+	std::string reference;
+};
+
 struct ofxGgmlVideoRequest {
 	std::string videoPath;
 	std::string prompt;
 	std::vector<std::string> tags;
+	ofxGgmlVideoTemporalWindow temporalWindow;
 };
 
 struct ofxGgmlVideoResult {
@@ -14,6 +28,33 @@ struct ofxGgmlVideoResult {
 	std::string text;
 	std::string error;
 	std::vector<std::string> references;
+	std::vector<ofxGgmlVideoFrameSample> frameSamples;
+
+	explicit operator bool() const {
+		return success;
+	}
+};
+
+struct ofxGgmlVideoMontageSegment {
+	int index = 0;
+	std::string sourcePath;
+	std::string label;
+	double sourceStartSeconds = 0.0;
+	double durationSeconds = 0.0;
+	double timelineStartSeconds = 0.0;
+	std::vector<std::string> tags;
+	std::vector<std::string> references;
+	std::vector<ofxGgmlVideoFrameSample> frameSamples;
+};
+
+struct ofxGgmlVideoMontagePlan {
+	bool success = false;
+	std::string prompt;
+	std::string text;
+	std::string error;
+	double durationSeconds = 0.0;
+	std::vector<std::string> references;
+	std::vector<ofxGgmlVideoMontageSegment> segments;
 
 	explicit operator bool() const {
 		return success;

@@ -68,6 +68,15 @@ Assert-FileContains (Join-Path $exampleRoot "addons.make") "(?m)^ofxImGui\s*$" "
 Assert-Path (Join-Path $exampleRoot "src\main.cpp") "smoke example main.cpp"
 Assert-Path (Join-Path $exampleRoot "src\ofApp.h") "smoke example ofApp.h"
 Assert-Path (Join-Path $exampleRoot "src\ofApp.cpp") "smoke example ofApp.cpp"
+
+$montageExampleRoot = Join-Path $addonRoot "ofxGgmlVideoMontageExample"
+Assert-Path $montageExampleRoot "root-level montage example" -Directory
+Assert-Path (Join-Path $montageExampleRoot "addons.make") "montage example addons.make"
+Assert-FileContains (Join-Path $montageExampleRoot "addons.make") "(?m)^ofxImGui\s*$" "montage example addons.make"
+Assert-Path (Join-Path $montageExampleRoot "src\main.cpp") "montage example main.cpp"
+Assert-Path (Join-Path $montageExampleRoot "src\ofApp.h") "montage example ofApp.h"
+Assert-Path (Join-Path $montageExampleRoot "src\ofApp.cpp") "montage example ofApp.cpp"
+
 Assert-Path (Join-Path $addonRoot "tests\CMakeLists.txt") "test CMakeLists"
 Assert-Path (Join-Path $addonRoot "tests\test_main.cpp") "test source"
 Assert-Path (Join-Path $scriptRoot "doctor-video.ps1") "Video doctor script"
@@ -91,6 +100,9 @@ $forbidden = @(
 	"ofxGgmlVideoFrameExample\bin",
 	"ofxGgmlVideoFrameExample\obj",
 	"ofxGgmlVideoFrameExample\.vs",
+	"ofxGgmlVideoMontageExample\bin",
+	"ofxGgmlVideoMontageExample\obj",
+	"ofxGgmlVideoMontageExample\.vs",
 	"models"
 )
 

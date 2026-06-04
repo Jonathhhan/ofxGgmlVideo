@@ -1,9 +1,9 @@
 # Video Workflow Boundaries
 
-`ofxGgmlVideo` owns video understanding, frame pipelines, temporal analysis,
-and sequence-generation workflows for the ofxGgml ecosystem. This document is
-for Codex, GitHub Copilot, Hermes Agent, and human contributors planning
-video-lane work before changing runtime behavior.
+`ofxGgmlVideo` owns video montage workflows, clip timelines, frame pipelines,
+temporal sampling, and video-to-agent handoff planning for the ofxGgml
+ecosystem. This document is for Codex, GitHub Copilot, Hermes Agent, and human
+contributors planning video-lane work before changing runtime behavior.
 
 This guide follows the split rule from the legacy/reference `ofxGgml` docs:
 domain workflows, generated media, model-specific preprocessing, and heavy
@@ -16,11 +16,17 @@ focused tests.
 This addon may define:
 
 - video request/result shapes
+- montage plan, edit-decision segment, and timeline metadata shapes
+- deterministic edit-decision-list handoff text
 - frame sampling and temporal window planning
 - video decoding and media handoff documentation
-- temporal analysis, event, montage, and scene workflows
-- temporal diffusion, image-to-video, GAN, and sequence-generation boundaries
-- video restoration, frame interpolation, and frame-to-frame workflows
+- temporal analysis, event, montage, scene, and clip-selection workflows
+- handoff points for agentic MontageAutomat decisions owned by
+  `ofxGgmlAgents` or the app layer
+- handoff points for CLIP-style scoring, embeddings, and visual search owned by
+  `ofxGgmlVision` or the app layer
+- video-side result organization for generated or transformed clips owned by
+  another addon
 - focused frame and video examples
 
 ## Not owned here
@@ -28,10 +34,14 @@ This addon may define:
 Keep these responsibilities out of `ofxGgmlVideo`:
 
 - ggml setup, backend selection, and runtime discovery owned by `ofxGgmlCore`
+- agent planning, memory, autonomous edit decisions, and tool routing owned by
+  `ofxGgmlAgents` or the app layer
 - single-image understanding, CLIP, captions, or VLM workflows owned by
   `ofxGgmlVision`
 - image-first diffusion, inpainting, identity adapters, or still-image
   generation owned by `ofxGgmlDiffusion`
+- Stable Diffusion image-to-video generation owned by
+  `ofxGgmlStableDiffusion` or the diffusion lane
 - audio transcription, music, or voice workflows owned by audio/music lanes
 - committed video files, extracted frame caches, generated videos, model files,
   native build trees, or generated openFrameworks project files
@@ -52,8 +62,9 @@ Out of scope:
 Validation:
 ```
 
-Runtime changes should name whether the path changes decoding, frame sampling,
-temporal analysis, sequence generation, frame export, or example UI.
+Runtime changes should name whether the path changes decoding, montage
+planning, clip planning, frame sampling, temporal analysis, agent handoff,
+vision/CLIP handoff, frame export, or example UI.
 
 ## Validation ladder
 
@@ -78,6 +89,9 @@ caches, or committing generated videos.
 Good early video-lane tasks are:
 
 - documenting frame sampling and temporal-window assumptions
+- defining montage segment, timeline, and edit-decision metadata
+- defining edit-decision-list export and handoff metadata
+- defining video clip planning and agent/CLIP/vision handoff metadata
 - defining generated frame and video artifact rules
 - clarifying image-first work that should remain in `ofxGgmlDiffusion`
 - clarifying image-understanding work that should remain in `ofxGgmlVision`
