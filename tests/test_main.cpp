@@ -91,10 +91,47 @@ int main() {
 
 	const auto edl = ofxGgmlVideoUtils::toMontageEdl(montage);
 	if (edl.find("TITLE montageautomat draft") == std::string::npos ||
-		edl.find("SEGMENT 000 TL 0.000s +2.000s SRC videos/clip.mp4 @1.000s") == std::string::npos ||
+		edl.find("SEGMENT 000 TL 0.000s-2.000s +2.000s SRC videos/clip.mp4 @1.000s-3.000s") == std::string::npos ||
 		edl.find("TAGS reaction,closeup") == std::string::npos ||
+		edl.find("HANDLE IN 0.000s OUT 0.000s") == std::string::npos ||
 		edl.find("REF videos/clip.mp4#frame@1.000s") == std::string::npos) {
 		std::cerr << "montage EDL did not include expected edit decisions\n";
+		return 1;
+	}
+
+	ofxGgmlVideoMontageOptions options;
+	options.prompt = "crossfade draft";
+	options.defaultTransitionKind = "crossfade";
+	options.transitionSeconds = 0.5;
+	options.handleSeconds = 0.25;
+	options.overlapTransitions = true;
+	const auto crossfadeMontage = ofxGgmlVideoUtils::planMontage({request, cutaway}, options);
+	if (!crossfadeMontage ||
+		crossfadeMontage.durationSeconds != 2.5 ||
+		crossfadeMontage.transitionKind != "crossfade" ||
+		crossfadeMontage.segments[0].timelineEndSeconds != 2.0 ||
+		crossfadeMontage.segments[1].timelineStartSeconds != 1.5 ||
+		crossfadeMontage.segments[0].transitionOut.durationSeconds != 0.5 ||
+		crossfadeMontage.segments[1].transitionIn.kind != "crossfade" ||
+		crossfadeMontage.segments[1].handleInSeconds != 0.25) {
+		std::cerr << "crossfade montage options did not produce expected timeline metadata\n";
+		return 1;
+	}
+	const auto crossfadeEdl = ofxGgmlVideoUtils::toMontageEdl(crossfadeMontage);
+	if (crossfadeEdl.find("TRANSITION OUT crossfade 0.500s") == std::string::npos ||
+		crossfadeEdl.find("TRANSITION IN crossfade 0.500s") == std::string::npos ||
+		ofxGgmlVideoUtils::describe(crossfadeMontage).find("handles=0.250s") == std::string::npos) {
+		std::cerr << "crossfade montage EDL or description did not include transition metadata\n";
+		return 1;
+	}
+
+	options.overlapTransitions = false;
+	const auto nonOverlapMontage = ofxGgmlVideoUtils::planMontage({request, cutaway}, options);
+	if (!nonOverlapMontage ||
+		nonOverlapMontage.durationSeconds != 3.0 ||
+		nonOverlapMontage.segments[1].timelineStartSeconds != 2.0 ||
+		nonOverlapMontage.segments[0].transitionOut.durationSeconds != 0.5) {
+		std::cerr << "non-overlap transition metadata changed timeline unexpectedly\n";
 		return 1;
 	}
 

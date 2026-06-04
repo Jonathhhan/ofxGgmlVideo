@@ -4,6 +4,8 @@
 
 - Added deterministic clip-window frame sampling helpers.
 - Added deterministic montage segment and timeline plan helpers.
+- Added montage transition, handle, timeline-end, and overlapping crossfade
+  metadata for deterministic edit-decision handoffs.
 - Added deterministic montage edit-decision-list handoff export.
 - Updated the frame smoke example to show a MontageAutomat-style plan for later
   agent and vision/CLIP handoff.

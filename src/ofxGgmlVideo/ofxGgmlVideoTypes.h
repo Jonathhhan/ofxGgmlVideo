@@ -23,6 +23,19 @@ struct ofxGgmlVideoRequest {
 	ofxGgmlVideoTemporalWindow temporalWindow;
 };
 
+struct ofxGgmlVideoMontageTransition {
+	std::string kind = "cut";
+	double durationSeconds = 0.0;
+};
+
+struct ofxGgmlVideoMontageOptions {
+	std::string prompt;
+	std::string defaultTransitionKind = "cut";
+	double transitionSeconds = 0.0;
+	double handleSeconds = 0.0;
+	bool overlapTransitions = false;
+};
+
 struct ofxGgmlVideoResult {
 	bool success = false;
 	std::string text;
@@ -40,8 +53,14 @@ struct ofxGgmlVideoMontageSegment {
 	std::string sourcePath;
 	std::string label;
 	double sourceStartSeconds = 0.0;
+	double sourceEndSeconds = 0.0;
 	double durationSeconds = 0.0;
 	double timelineStartSeconds = 0.0;
+	double timelineEndSeconds = 0.0;
+	double handleInSeconds = 0.0;
+	double handleOutSeconds = 0.0;
+	ofxGgmlVideoMontageTransition transitionIn;
+	ofxGgmlVideoMontageTransition transitionOut;
 	std::vector<std::string> tags;
 	std::vector<std::string> references;
 	std::vector<ofxGgmlVideoFrameSample> frameSamples;
@@ -53,6 +72,10 @@ struct ofxGgmlVideoMontagePlan {
 	std::string text;
 	std::string error;
 	double durationSeconds = 0.0;
+	double handleSeconds = 0.0;
+	double transitionSeconds = 0.0;
+	std::string transitionKind = "cut";
+	bool overlapTransitions = false;
 	std::vector<std::string> references;
 	std::vector<ofxGgmlVideoMontageSegment> segments;
 

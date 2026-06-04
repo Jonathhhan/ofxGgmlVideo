@@ -18,6 +18,7 @@ private:
 	void drawSegmentDetails();
 
 	std::vector<ofxGgmlVideoRequest> clips;
+	ofxGgmlVideoMontageOptions montageOptions;
 	ofxGgmlVideoMontagePlan montagePlan;
 	std::string status;
 	std::string editDecisionList;

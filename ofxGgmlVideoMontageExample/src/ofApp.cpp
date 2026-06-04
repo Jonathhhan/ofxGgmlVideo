@@ -30,11 +30,17 @@ void ofApp::setup() {
 	clips.push_back(makeClip("videos/broll.mp4", "hands and process", 18.0, 4.0, 1.0, 4, {"broll", "texture"}));
 	clips.push_back(makeClip("videos/reaction.mp4", "reaction beat", 8.0, 2.0, 2.0, 4, {"reaction", "closeup"}));
 
+	montageOptions.prompt = "montageautomat assembly";
+	montageOptions.defaultTransitionKind = "crossfade";
+	montageOptions.transitionSeconds = 0.5;
+	montageOptions.handleSeconds = 0.25;
+	montageOptions.overlapTransitions = true;
+
 	rebuildMontage();
 }
 
 void ofApp::rebuildMontage() {
-	montagePlan = ofxGgmlVideoUtils::planMontage(clips, "montageautomat assembly");
+	montagePlan = ofxGgmlVideoUtils::planMontage(clips, montageOptions);
 	status = ofxGgmlVideoUtils::describe(montagePlan);
 	editDecisionList = ofxGgmlVideoUtils::toMontageEdl(montagePlan);
 	selectedSegment = std::min(selectedSegment, std::max(0, static_cast<int>(montagePlan.segments.size()) - 1));
@@ -68,6 +74,29 @@ void ofApp::draw() {
 
 void ofApp::drawClipControls() {
 	bool changed = false;
+	ImGui::TextUnformatted("Montage options");
+	float transitionSeconds = static_cast<float>(montageOptions.transitionSeconds);
+	float handleSeconds = static_cast<float>(montageOptions.handleSeconds);
+	bool overlapTransitions = montageOptions.overlapTransitions;
+	const char * transitionKinds[] = {"cut", "crossfade", "dip", "wipe"};
+	int transitionIndex = 0;
+	for (int i = 0; i < 4; ++i) {
+		if (montageOptions.defaultTransitionKind == transitionKinds[i]) {
+			transitionIndex = i;
+			break;
+		}
+	}
+	changed |= ImGui::Combo("transition", &transitionIndex, transitionKinds, 4);
+	changed |= ImGui::DragFloat("transition duration", &transitionSeconds, 0.05f, 0.0f, 10.0f, "%.2fs");
+	changed |= ImGui::DragFloat("source handles", &handleSeconds, 0.05f, 0.0f, 30.0f, "%.2fs");
+	changed |= ImGui::Checkbox("overlap transitions", &overlapTransitions);
+	montageOptions.defaultTransitionKind = transitionKinds[transitionIndex];
+	montageOptions.transitionSeconds = transitionSeconds;
+	montageOptions.handleSeconds = handleSeconds;
+	montageOptions.overlapTransitions = overlapTransitions;
+
+	ImGui::Separator();
+	ImGui::TextUnformatted("Clips");
 	for (std::size_t i = 0; i < clips.size(); ++i) {
 		auto & clip = clips[i];
 		ImGui::PushID(static_cast<int>(i));
@@ -120,6 +149,18 @@ void ofApp::drawTimeline() {
 		const float w = std::max(6.0f, static_cast<float>(segment.durationSeconds) * scale);
 		const ImU32 color = segment.index % 2 == 0 ? IM_COL32(67, 132, 180, 255) : IM_COL32(88, 160, 104, 255);
 		drawList->AddRectFilled(ImVec2(x, y), ImVec2(x + w, y + 20.0f), color, 3.0f);
+		if (segment.transitionIn.durationSeconds > 0.0) {
+			const float transitionWidth = static_cast<float>(segment.transitionIn.durationSeconds) * scale;
+			drawList->AddRectFilled(ImVec2(x, y),
+				ImVec2(x + transitionWidth, y + 20.0f),
+				IM_COL32(240, 190, 80, 140), 3.0f);
+		}
+		if (segment.transitionOut.durationSeconds > 0.0) {
+			const float transitionWidth = static_cast<float>(segment.transitionOut.durationSeconds) * scale;
+			drawList->AddRectFilled(ImVec2(x + w - transitionWidth, y),
+				ImVec2(x + w, y + 20.0f),
+				IM_COL32(240, 190, 80, 140), 3.0f);
+		}
 		drawList->AddText(ImVec2(x + 6.0f, y + 3.0f), IM_COL32(255, 255, 255, 255), segment.label.c_str());
 	}
 
@@ -141,8 +182,11 @@ void ofApp::drawSegmentDetails() {
 		const auto & segment = montagePlan.segments[static_cast<std::size_t>(selectedSegment)];
 		ImGui::Spacing();
 		ImGui::TextWrapped("source: %s", segment.sourcePath.c_str());
-		ImGui::Text("timeline: %.3fs + %.3fs", segment.timelineStartSeconds, segment.durationSeconds);
-		ImGui::Text("source: %.3fs + %.3fs", segment.sourceStartSeconds, segment.durationSeconds);
+		ImGui::Text("timeline: %.3fs - %.3fs (+%.3fs)", segment.timelineStartSeconds, segment.timelineEndSeconds, segment.durationSeconds);
+		ImGui::Text("source: %.3fs - %.3fs (+%.3fs)", segment.sourceStartSeconds, segment.sourceEndSeconds, segment.durationSeconds);
+		ImGui::Text("handles: in %.3fs out %.3fs", segment.handleInSeconds, segment.handleOutSeconds);
+		ImGui::Text("transition in: %s %.3fs", segment.transitionIn.kind.c_str(), segment.transitionIn.durationSeconds);
+		ImGui::Text("transition out: %s %.3fs", segment.transitionOut.kind.c_str(), segment.transitionOut.durationSeconds);
 		ImGui::TextUnformatted("frame references");
 		for (const auto & reference : segment.references) {
 			ImGui::BulletText("%s", reference.c_str());

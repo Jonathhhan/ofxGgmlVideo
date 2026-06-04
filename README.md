@@ -34,8 +34,9 @@ Current addon API version: `1.0.1`.
 
 `ofxGgmlVideoMontageExample` is a root-level MontageAutomat substrate example.
 It shows clip-window controls, deterministic frame references, ordered montage
-segments, a simple timeline preview, and an edit-decision-list handoff without
-claiming autonomous editing or media decoding.
+segments, transition and handle controls, a simple timeline preview, and an
+edit-decision-list handoff without claiming autonomous editing or media
+decoding.
 
 For video-lane planning, temporal boundaries, and generated media rules, see
 [docs/VIDEO_WORKFLOWS.md](docs/VIDEO_WORKFLOWS.md).
@@ -61,6 +62,13 @@ On macOS/Linux:
 ./scripts/run-video-runtime-smoke.sh -Json -SummaryOnly
 ./scripts/validate-local.sh
 ```
+
+Montage plans can stay as straight cuts or use deterministic transition
+metadata. `ofxGgmlVideoMontageOptions` adds a default transition kind,
+transition duration, source-handle duration, and optional overlapping timeline
+placement for crossfade-style handoffs. The generated EDL includes source and
+timeline ranges, handles, transition hints, tags, and frame references without
+creating media.
 
 `scripts\run-video-runtime-smoke.*` is the lane-owned runtime-smoke entrypoint
 for ecosystem planning and CI rollouts. It currently proves the deterministic

@@ -17,6 +17,7 @@ This addon may define:
 
 - video request/result shapes
 - montage plan, edit-decision segment, and timeline metadata shapes
+- transition, source-handle, and overlapping montage timing metadata
 - deterministic edit-decision-list handoff text
 - frame sampling and temporal window planning
 - video decoding and media handoff documentation
@@ -74,6 +75,7 @@ Use the smallest command that proves the changed layer:
 | --- | --- |
 | Docs or planning only | `scripts\validate-local.bat` |
 | Local setup diagnosis | `scripts\doctor-video.bat` |
+| Montage transition or handle helpers | `scripts\test-addon.bat` |
 | Request/result/helper changes | `scripts\test-addon.bat` |
 | Ecosystem runtime smoke evidence | `scripts\run-video-runtime-smoke.bat -Json -SummaryOnly` |
 | Example layout changes | `scripts\validate-local.bat` |
@@ -90,6 +92,7 @@ Good early video-lane tasks are:
 
 - documenting frame sampling and temporal-window assumptions
 - defining montage segment, timeline, and edit-decision metadata
+- adding deterministic transition or handle metadata without decoding media
 - defining edit-decision-list export and handoff metadata
 - defining video clip planning and agent/CLIP/vision handoff metadata
 - defining generated frame and video artifact rules

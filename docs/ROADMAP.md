@@ -7,6 +7,7 @@
 - Keep `ofxGgmlCore` as the only required library dependency; examples may depend on `ofxImGui`.
 - Add deterministic clip-window frame sampling helpers.
 - Add deterministic montage segment and timeline plan helpers.
+- Add transition, handle, and overlapping timeline metadata for montage plans.
 - Add deterministic edit-decision-list handoff helpers.
 - Add local validation and headless tests.
 - Add independent addon version metadata and release-candidate docs.

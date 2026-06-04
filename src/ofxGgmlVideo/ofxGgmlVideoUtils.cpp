@@ -13,6 +13,26 @@ namespace ofxGgmlVideoUtils {
 			return stream.str();
 		}
 
+		double clampNonNegative(const double value) {
+			return std::max(0.0, value);
+		}
+
+		std::string normalizedTransitionKind(const std::string & kind) {
+			return kind.empty() ? "cut" : kind;
+		}
+
+		double transitionBetween(const ofxGgmlVideoMontageOptions & options,
+		                         const ofxGgmlVideoRequest & previous,
+		                         const ofxGgmlVideoRequest & current) {
+			const auto requested = clampNonNegative(options.transitionSeconds);
+			if (requested <= 0.0) {
+				return 0.0;
+			}
+			return std::min({requested,
+				previous.temporalWindow.durationSeconds * 0.5,
+				current.temporalWindow.durationSeconds * 0.5});
+		}
+
 		std::string joinTags(const std::vector<std::string> & tags) {
 			if (tags.empty()) {
 				return "-";
@@ -66,6 +86,16 @@ namespace ofxGgmlVideoUtils {
 		std::ostringstream description;
 		description << "video: montage plan segments=" << plan.segments.size()
 			<< " duration=" << formatSeconds(plan.durationSeconds);
+		if (plan.transitionSeconds > 0.0) {
+			description << " transition=" << plan.transitionKind
+				<< "+" << formatSeconds(plan.transitionSeconds);
+			if (plan.overlapTransitions) {
+				description << " overlap";
+			}
+		}
+		if (plan.handleSeconds > 0.0) {
+			description << " handles=" << formatSeconds(plan.handleSeconds);
+		}
 		if (!plan.prompt.empty()) {
 			description << " prompt=\"" << plan.prompt << "\"";
 		}
@@ -124,13 +154,29 @@ namespace ofxGgmlVideoUtils {
 	}
 
 	ofxGgmlVideoMontageSegment makeMontageSegment(const ofxGgmlVideoRequest & request, const int index, const double timelineStartSeconds) {
+		ofxGgmlVideoMontageOptions options;
+		return makeMontageSegment(request, index, timelineStartSeconds, options);
+	}
+
+	ofxGgmlVideoMontageSegment makeMontageSegment(const ofxGgmlVideoRequest & request,
+	                                              const int index,
+	                                              const double timelineStartSeconds,
+	                                              const ofxGgmlVideoMontageOptions & options) {
 		ofxGgmlVideoMontageSegment segment;
 		segment.index = index;
 		segment.sourcePath = request.videoPath;
 		segment.label = request.prompt.empty() ? request.videoPath : request.prompt;
 		segment.sourceStartSeconds = request.temporalWindow.startSeconds;
+		segment.sourceEndSeconds = request.temporalWindow.startSeconds + request.temporalWindow.durationSeconds;
 		segment.durationSeconds = request.temporalWindow.durationSeconds;
 		segment.timelineStartSeconds = timelineStartSeconds;
+		segment.timelineEndSeconds = timelineStartSeconds + segment.durationSeconds;
+		segment.handleInSeconds = std::min(clampNonNegative(options.handleSeconds), segment.sourceStartSeconds);
+		segment.handleOutSeconds = clampNonNegative(options.handleSeconds);
+		segment.transitionIn.kind = "cut";
+		segment.transitionOut.kind = normalizedTransitionKind(options.defaultTransitionKind);
+		segment.transitionIn.durationSeconds = 0.0;
+		segment.transitionOut.durationSeconds = clampNonNegative(options.transitionSeconds);
 		segment.tags = request.tags;
 		segment.frameSamples = planFrameSamples(request.temporalWindow);
 		for (const auto & sample : segment.frameSamples) {
@@ -140,8 +186,18 @@ namespace ofxGgmlVideoUtils {
 	}
 
 	ofxGgmlVideoMontagePlan planMontage(const std::vector<ofxGgmlVideoRequest> & requests, const std::string & prompt) {
+		ofxGgmlVideoMontageOptions options;
+		options.prompt = prompt;
+		return planMontage(requests, options);
+	}
+
+	ofxGgmlVideoMontagePlan planMontage(const std::vector<ofxGgmlVideoRequest> & requests, const ofxGgmlVideoMontageOptions & options) {
 		ofxGgmlVideoMontagePlan plan;
-		plan.prompt = prompt;
+		plan.prompt = options.prompt;
+		plan.handleSeconds = clampNonNegative(options.handleSeconds);
+		plan.transitionSeconds = clampNonNegative(options.transitionSeconds);
+		plan.transitionKind = normalizedTransitionKind(options.defaultTransitionKind);
+		plan.overlapTransitions = options.overlapTransitions;
 		if (requests.empty()) {
 			plan.error = "video: empty montage";
 			return plan;
@@ -155,11 +211,28 @@ namespace ofxGgmlVideoUtils {
 				return plan;
 			}
 
-			auto segment = makeMontageSegment(requests[i], static_cast<int>(i), timelineStartSeconds);
+			const auto transitionSeconds = i > 0 ? transitionBetween(options, requests[i - 1], requests[i]) : 0.0;
+			if (i > 0 && options.overlapTransitions) {
+				timelineStartSeconds = std::max(0.0, timelineStartSeconds - transitionSeconds);
+			}
+
+			auto segment = makeMontageSegment(requests[i], static_cast<int>(i), timelineStartSeconds, options);
+			if (i > 0) {
+				segment.transitionIn.kind = plan.transitionKind;
+				segment.transitionIn.durationSeconds = transitionSeconds;
+				if (!plan.segments.empty()) {
+					plan.segments.back().transitionOut.kind = plan.transitionKind;
+					plan.segments.back().transitionOut.durationSeconds = transitionSeconds;
+				}
+			}
+			if (i + 1 == requests.size()) {
+				segment.transitionOut.kind = "cut";
+				segment.transitionOut.durationSeconds = 0.0;
+			}
 			for (const auto & reference : segment.references) {
 				plan.references.push_back(reference);
 			}
-			timelineStartSeconds += segment.durationSeconds;
+			timelineStartSeconds = segment.timelineEndSeconds;
 			plan.segments.push_back(segment);
 		}
 
@@ -180,12 +253,27 @@ namespace ofxGgmlVideoUtils {
 		for (const auto & segment : plan.segments) {
 			stream << "SEGMENT " << std::setw(3) << std::setfill('0') << segment.index << std::setfill(' ')
 				<< " TL " << formatSeconds(segment.timelineStartSeconds)
+				<< "-" << formatSeconds(segment.timelineEndSeconds)
 				<< " +" << formatSeconds(segment.durationSeconds)
 				<< " SRC " << segment.sourcePath
 				<< " @" << formatSeconds(segment.sourceStartSeconds)
+				<< "-" << formatSeconds(segment.sourceEndSeconds)
 				<< " LABEL " << segment.label
 				<< " TAGS " << joinTags(segment.tags)
 				<< "\n";
+			stream << "HANDLE IN " << formatSeconds(segment.handleInSeconds)
+				<< " OUT " << formatSeconds(segment.handleOutSeconds)
+				<< "\n";
+			if (segment.transitionIn.durationSeconds > 0.0) {
+				stream << "TRANSITION IN " << segment.transitionIn.kind
+					<< " " << formatSeconds(segment.transitionIn.durationSeconds)
+					<< "\n";
+			}
+			if (segment.transitionOut.durationSeconds > 0.0) {
+				stream << "TRANSITION OUT " << segment.transitionOut.kind
+					<< " " << formatSeconds(segment.transitionOut.durationSeconds)
+					<< "\n";
+			}
 			for (const auto & reference : segment.references) {
 				stream << "REF " << reference << "\n";
 			}
