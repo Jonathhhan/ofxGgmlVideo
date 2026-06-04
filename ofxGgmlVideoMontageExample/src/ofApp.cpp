@@ -82,7 +82,7 @@ void ofApp::drawClipControls() {
 			changed |= ImGui::DragFloat("source start", &start, 0.1f, 0.0f, 3600.0f, "%.2fs");
 			changed |= ImGui::DragFloat("duration", &duration, 0.1f, 0.1f, 600.0f, "%.2fs");
 			changed |= ImGui::DragFloat("sample fps", &sampleRate, 0.1f, 0.1f, 60.0f, "%.2f");
-			changed |= ImGui::SliderInt("max frames", &maxFrames, 0, 24);
+			changed |= ImGui::SliderInt("max frames", &maxFrames, 0, 300);
 
 			clip.temporalWindow.startSeconds = start;
 			clip.temporalWindow.durationSeconds = duration;
