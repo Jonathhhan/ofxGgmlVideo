@@ -280,4 +280,77 @@ namespace ofxGgmlVideoUtils {
 		}
 		return stream.str();
 	}
+
+	ofxGgmlVideoMontageHandoff makeMontageHandoff(const ofxGgmlVideoMontagePlan & plan,
+	                                               const std::string & decisionOwner,
+	                                               const std::string & scoringOwner,
+	                                               const std::string & bridgeOwner) {
+		ofxGgmlVideoMontageHandoff handoff;
+		handoff.decisionOwner = decisionOwner.empty() ? "ofxGgmlAgents" : decisionOwner;
+		handoff.scoringOwner = scoringOwner.empty() ? "ofxGgmlVision" : scoringOwner;
+		handoff.bridgeOwner = bridgeOwner.empty() ? "app-layer" : bridgeOwner;
+		if (!plan) {
+			handoff.error = plan.error.empty() ? "video: invalid montage handoff source" : plan.error;
+			return handoff;
+		}
+
+		handoff.prompt = plan.prompt;
+		handoff.references = plan.references;
+		handoff.warnings.push_back("agentic clip choice belongs to " + handoff.decisionOwner);
+		handoff.warnings.push_back("CLIP-style scoring and embeddings belong to " + handoff.scoringOwner);
+		handoff.warnings.push_back("external bridge outputs belong to " + handoff.bridgeOwner);
+		for (const auto & segment : plan.segments) {
+			ofxGgmlVideoMontageHandoffSegment handoffSegment;
+			handoffSegment.segmentIndex = segment.index;
+			handoffSegment.sourcePath = segment.sourcePath;
+			handoffSegment.label = segment.label;
+			handoffSegment.agentReason = "pending agent decision";
+			handoffSegment.temporalSummary = "pending temporal summary";
+			handoffSegment.scoreKind = "unscored";
+			handoffSegment.embeddingReference = "pending embedding reference";
+			handoffSegment.bridgeOutputKind = "none";
+			handoffSegment.bridgeOutputReference = "none";
+			handoffSegment.references = segment.references;
+			handoff.segments.push_back(handoffSegment);
+		}
+
+		handoff.success = true;
+		handoff.text = toMontageHandoffText(handoff);
+		return handoff;
+	}
+
+	std::string toMontageHandoffText(const ofxGgmlVideoMontageHandoff & handoff) {
+		if (!handoff) {
+			return "";
+		}
+
+		std::ostringstream stream;
+		stream << "CONTRACT " << handoff.contractVersion << "\n";
+		stream << "DECISION_OWNER " << handoff.decisionOwner << "\n";
+		stream << "SCORING_OWNER " << handoff.scoringOwner << "\n";
+		stream << "BRIDGE_OWNER " << handoff.bridgeOwner << "\n";
+		stream << "PROMPT " << (handoff.prompt.empty() ? "-" : handoff.prompt) << "\n";
+		for (const auto & warning : handoff.warnings) {
+			stream << "WARNING " << warning << "\n";
+		}
+		for (const auto & segment : handoff.segments) {
+			stream << "HANDOFF_SEGMENT " << std::setw(3) << std::setfill('0') << segment.segmentIndex << std::setfill(' ')
+				<< " SRC " << segment.sourcePath
+				<< " LABEL " << segment.label
+				<< " SCORE " << segment.scoreKind << ":" << std::fixed << std::setprecision(3) << segment.score
+				<< "\n";
+			stream << "AGENT_REASON " << segment.agentReason << "\n";
+			stream << "TEMPORAL_SUMMARY " << segment.temporalSummary << "\n";
+			stream << "EMBEDDING " << segment.embeddingReference
+				<< " DIMS " << segment.embeddingDimensions
+				<< "\n";
+			stream << "BRIDGE_OUTPUT " << segment.bridgeOutputKind
+				<< " " << segment.bridgeOutputReference
+				<< "\n";
+			for (const auto & reference : segment.references) {
+				stream << "REF " << reference << "\n";
+			}
+		}
+		return stream.str();
+	}
 }

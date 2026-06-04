@@ -70,6 +70,13 @@ placement for crossfade-style handoffs. The generated EDL includes source and
 timeline ranges, handles, transition hints, tags, and frame references without
 creating media.
 
+`ofxGgmlVideoUtils::makeMontageHandoff()` creates a deterministic
+`montage-handoff-v1` record from a montage plan. The handoff records segment
+references and explicit owner slots for agent decisions, CLIP-style scoring,
+embedding references, temporal summaries, and external bridge outputs while
+leaving those runtime decisions in `ofxGgmlAgents`, `ofxGgmlVision`, or the app
+layer.
+
 `scripts\run-video-runtime-smoke.*` is the lane-owned runtime-smoke entrypoint
 for ecosystem planning and CI rollouts. It currently proves the deterministic
 video request/helper boundary, clip-window sampling helpers, montage plan

@@ -125,6 +125,33 @@ int main() {
 		return 1;
 	}
 
+	const auto handoff = ofxGgmlVideoUtils::makeMontageHandoff(crossfadeMontage);
+	const auto handoffText = ofxGgmlVideoUtils::toMontageHandoffText(handoff);
+	if (!handoff ||
+		handoff.contractVersion != "montage-handoff-v1" ||
+		handoff.decisionOwner != "ofxGgmlAgents" ||
+		handoff.scoringOwner != "ofxGgmlVision" ||
+		handoff.segments.size() != crossfadeMontage.segments.size() ||
+		handoff.segments[0].scoreKind != "unscored" ||
+		handoff.segments[0].embeddingReference.find("pending") == std::string::npos ||
+		handoffText.find("CONTRACT montage-handoff-v1") == std::string::npos ||
+		handoffText.find("DECISION_OWNER ofxGgmlAgents") == std::string::npos ||
+		handoffText.find("SCORING_OWNER ofxGgmlVision") == std::string::npos ||
+		handoffText.find("HANDOFF_SEGMENT 000 SRC videos/clip.mp4") == std::string::npos ||
+		handoffText.find("EMBEDDING pending embedding reference DIMS 0") == std::string::npos) {
+		std::cerr << "montage handoff contract did not include expected agent and scoring metadata\n";
+		return 1;
+	}
+
+	const auto customHandoff = ofxGgmlVideoUtils::makeMontageHandoff(crossfadeMontage, "editor-agent", "clip-index", "bridge-runner");
+	if (!customHandoff ||
+		customHandoff.decisionOwner != "editor-agent" ||
+		customHandoff.scoringOwner != "clip-index" ||
+		customHandoff.bridgeOwner != "bridge-runner") {
+		std::cerr << "montage handoff did not preserve custom owners\n";
+		return 1;
+	}
+
 	options.overlapTransitions = false;
 	const auto nonOverlapMontage = ofxGgmlVideoUtils::planMontage({request, cutaway}, options);
 	if (!nonOverlapMontage ||

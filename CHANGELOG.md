@@ -7,6 +7,9 @@
 - Added montage transition, handle, timeline-end, and overlapping crossfade
   metadata for deterministic edit-decision handoffs.
 - Added deterministic montage edit-decision-list handoff export.
+- Added deterministic MontageAutomat handoff records with explicit owner slots
+  for agent decisions, CLIP-style scoring, embeddings, temporal summaries, and
+  external bridge outputs.
 - Updated the frame smoke example to show a MontageAutomat-style plan for later
   agent and vision/CLIP handoff.
 - Added `ofxGgmlVideoMontageExample` as a root-level ImGui montage substrate

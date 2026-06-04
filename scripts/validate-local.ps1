@@ -57,6 +57,9 @@ Assert-Path (Join-Path $addonRoot "src\ofxGgmlVideo\ofxGgmlVideoUtils.h") "utili
 Assert-Path (Join-Path $addonRoot "src\ofxGgmlVideo\ofxGgmlVideoUtils.cpp") "utility source"
 Assert-FileContains (Join-Path $addonRoot "src\ofxGgmlVideo\ofxGgmlVideoTypes.h") "ofxGgmlVideoMontageOptions" "montage options type"
 Assert-FileContains (Join-Path $addonRoot "src\ofxGgmlVideo\ofxGgmlVideoTypes.h") "transitionOut" "montage transition metadata"
+Assert-FileContains (Join-Path $addonRoot "src\ofxGgmlVideo\ofxGgmlVideoTypes.h") "ofxGgmlVideoMontageHandoff" "montage handoff type"
+Assert-FileContains (Join-Path $addonRoot "src\ofxGgmlVideo\ofxGgmlVideoUtils.h") "makeMontageHandoff" "montage handoff helper"
+Assert-FileContains (Join-Path $addonRoot "docs\VIDEO_WORKFLOWS.md") "montage-handoff-v1" "montage handoff docs"
 
 Write-Step "Checking dependency layout"
 Assert-Path (Join-Path $addonsRoot "ofxGgmlCore") "sibling ofxGgmlCore addon" -Directory
@@ -80,6 +83,7 @@ Assert-Path (Join-Path $montageExampleRoot "src\ofApp.h") "montage example ofApp
 Assert-Path (Join-Path $montageExampleRoot "src\ofApp.cpp") "montage example ofApp.cpp"
 Assert-FileContains (Join-Path $montageExampleRoot "src\ofApp.cpp") "transition duration" "montage example transition controls"
 Assert-FileContains (Join-Path $montageExampleRoot "src\ofApp.cpp") "overlap transitions" "montage example overlap controls"
+Assert-FileContains (Join-Path $montageExampleRoot "src\ofApp.cpp") "Montage Handoff" "montage example handoff panel"
 
 Assert-Path (Join-Path $addonRoot "tests\CMakeLists.txt") "test CMakeLists"
 Assert-Path (Join-Path $addonRoot "tests\test_main.cpp") "test source"

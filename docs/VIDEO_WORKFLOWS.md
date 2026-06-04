@@ -94,6 +94,8 @@ Good early video-lane tasks are:
 - defining montage segment, timeline, and edit-decision metadata
 - adding deterministic transition or handle metadata without decoding media
 - defining edit-decision-list export and handoff metadata
+- defining MontageAutomat handoff contracts with decision owner, scoring owner,
+  embedding references, temporal summaries, and external bridge output slots
 - defining video clip planning and agent/CLIP/vision handoff metadata
 - defining generated frame and video artifact rules
 - clarifying image-first work that should remain in `ofxGgmlDiffusion`
@@ -103,3 +105,27 @@ Good early video-lane tasks are:
 Avoid broadening runtime behavior until input media, generated artifacts,
 backend-family expectations, user-visible outputs, and validation commands are
 explicit.
+
+## MontageAutomat handoff contract
+
+`ofxGgmlVideo` may create a deterministic `montage-handoff-v1` record from an
+existing montage plan. The contract records the video-side source clips,
+sampled frame references, labels, and timeline context, then leaves agentic
+fields as explicit slots for other owners:
+
+- `decisionOwner`: the agent or app layer that chose clips and order
+- `scoringOwner`: the vision or CLIP lane that scored frames, clips, or
+  embeddings
+- `bridgeOwner`: the external bridge or app layer that produced media-side
+  outputs
+- `agentReason`: the reason an agent selected or revised a segment
+- `temporalSummary`: a text summary of the segment's visual/temporal content
+- `scoreKind` and `score`: a CLIP-style, embedding, or app-specific score
+- `embeddingReference` and `embeddingDimensions`: references to embeddings
+  stored outside this addon
+- `bridgeOutputKind` and `bridgeOutputReference`: references to external bridge
+  outputs stored outside this addon
+
+Keep the handoff deterministic and text-exportable. Do not add autonomous edit
+decisions, CLIP inference, embedding storage, video decoding, or generated media
+ownership to this addon when filling these slots.

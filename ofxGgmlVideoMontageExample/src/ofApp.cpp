@@ -43,6 +43,8 @@ void ofApp::rebuildMontage() {
 	montagePlan = ofxGgmlVideoUtils::planMontage(clips, montageOptions);
 	status = ofxGgmlVideoUtils::describe(montagePlan);
 	editDecisionList = ofxGgmlVideoUtils::toMontageEdl(montagePlan);
+	montageHandoff = ofxGgmlVideoUtils::makeMontageHandoff(montagePlan);
+	handoffText = ofxGgmlVideoUtils::toMontageHandoffText(montageHandoff);
 	selectedSegment = std::min(selectedSegment, std::max(0, static_cast<int>(montagePlan.segments.size()) - 1));
 	ofLogNotice("ofxGgmlVideoMontageExample") << status;
 }
@@ -65,6 +67,10 @@ void ofApp::draw() {
 		ImGui::TextUnformatted("Edit Decision List");
 		ImGui::BeginChild("edl", ImVec2(0.0f, 120.0f), true);
 		ImGui::TextUnformatted(editDecisionList.c_str());
+		ImGui::EndChild();
+		ImGui::TextUnformatted("Montage Handoff");
+		ImGui::BeginChild("handoff", ImVec2(0.0f, 120.0f), true);
+		ImGui::TextUnformatted(handoffText.c_str());
 		ImGui::EndChild();
 	}
 	ImGui::End();

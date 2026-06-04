@@ -20,8 +20,10 @@ private:
 	std::vector<ofxGgmlVideoRequest> clips;
 	ofxGgmlVideoMontageOptions montageOptions;
 	ofxGgmlVideoMontagePlan montagePlan;
+	ofxGgmlVideoMontageHandoff montageHandoff;
 	std::string status;
 	std::string editDecisionList;
+	std::string handoffText;
 	int selectedSegment = 0;
 	ofxImGui::Gui gui;
 };

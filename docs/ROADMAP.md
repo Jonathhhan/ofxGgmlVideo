@@ -9,14 +9,15 @@
 - Add deterministic montage segment and timeline plan helpers.
 - Add transition, handle, and overlapping timeline metadata for montage plans.
 - Add deterministic edit-decision-list handoff helpers.
+- Add deterministic MontageAutomat handoff contracts for agent decisions,
+  CLIP-style scoring, embedding references, temporal summaries, and bridge
+  outputs.
 - Add local validation and headless tests.
 - Add independent addon version metadata and release-candidate docs.
 
 ## Next Milestones
 
 - Connect the first real local backend or bridge adapter.
-- Define MontageAutomat handoff contracts for agent-chosen clips, CLIP-style
-  scoring, embeddings, temporal summaries, and external bridge outputs.
 - Build the montage example into a user-provided-video workflow once decoding
   and media asset rules are explicit.
 - Add focused tests around request/result helpers.

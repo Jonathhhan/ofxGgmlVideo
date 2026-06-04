@@ -83,3 +83,36 @@ struct ofxGgmlVideoMontagePlan {
 		return success;
 	}
 };
+
+struct ofxGgmlVideoMontageHandoffSegment {
+	int segmentIndex = 0;
+	std::string sourcePath;
+	std::string label;
+	std::string agentReason;
+	std::string temporalSummary;
+	std::string scoreKind = "unscored";
+	double score = 0.0;
+	std::string embeddingReference;
+	int embeddingDimensions = 0;
+	std::string bridgeOutputKind;
+	std::string bridgeOutputReference;
+	std::vector<std::string> references;
+};
+
+struct ofxGgmlVideoMontageHandoff {
+	bool success = false;
+	std::string contractVersion = "montage-handoff-v1";
+	std::string decisionOwner = "ofxGgmlAgents";
+	std::string scoringOwner = "ofxGgmlVision";
+	std::string bridgeOwner = "app-layer";
+	std::string prompt;
+	std::string text;
+	std::string error;
+	std::vector<std::string> warnings;
+	std::vector<std::string> references;
+	std::vector<ofxGgmlVideoMontageHandoffSegment> segments;
+
+	explicit operator bool() const {
+		return success;
+	}
+};
