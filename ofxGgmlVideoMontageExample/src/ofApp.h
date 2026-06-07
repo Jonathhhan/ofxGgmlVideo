@@ -23,6 +23,7 @@ private:
 	ofxGgmlVideoMontageHandoff montageHandoff;
 	std::string status;
 	std::string editDecisionList;
+	std::string manifestJson;
 	std::string handoffText;
 	int selectedSegment = 0;
 	ofxImGui::Gui gui;

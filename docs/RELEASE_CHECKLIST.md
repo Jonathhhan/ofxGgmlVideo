@@ -60,6 +60,7 @@ macOS/Linux:
 - deterministic clip-window frame sampling helpers
 - deterministic montage timeline helpers
 - deterministic edit-decision-list handoff helper
+- deterministic montage manifest helper
 - clear future path for temporal analysis and agent/CLIP/vision handoff adapters
 
 This release does not promise a complete model-backed video runtime.

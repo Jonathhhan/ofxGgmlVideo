@@ -19,6 +19,7 @@ This addon may define:
 - montage plan, edit-decision segment, and timeline metadata shapes
 - transition, source-handle, and overlapping montage timing metadata
 - deterministic edit-decision-list handoff text
+- deterministic montage manifest text for agent and bridge handoff
 - frame sampling and temporal window planning
 - video decoding and media handoff documentation
 - temporal analysis, event, montage, scene, and clip-selection workflows
@@ -94,6 +95,7 @@ Good early video-lane tasks are:
 - defining montage segment, timeline, and edit-decision metadata
 - adding deterministic transition or handle metadata without decoding media
 - defining edit-decision-list export and handoff metadata
+- defining machine-readable montage manifest export metadata
 - defining MontageAutomat handoff contracts with decision owner, scoring owner,
   embedding references, temporal summaries, and external bridge output slots
 - defining video clip planning and agent/CLIP/vision handoff metadata

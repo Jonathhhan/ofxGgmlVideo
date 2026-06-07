@@ -18,6 +18,7 @@ namespace ofxGgmlVideoUtils {
 	ofxGgmlVideoMontagePlan planMontage(const std::vector<ofxGgmlVideoRequest> & requests, const std::string & prompt = "");
 	ofxGgmlVideoMontagePlan planMontage(const std::vector<ofxGgmlVideoRequest> & requests, const ofxGgmlVideoMontageOptions & options);
 	std::string toMontageEdl(const ofxGgmlVideoMontagePlan & plan);
+	std::string toMontageManifestJson(const ofxGgmlVideoMontagePlan & plan);
 	ofxGgmlVideoMontageHandoff makeMontageHandoff(const ofxGgmlVideoMontagePlan & plan,
 	                                               const std::string & decisionOwner = "ofxGgmlAgents",
 	                                               const std::string & scoringOwner = "ofxGgmlVision",

@@ -7,6 +7,8 @@
 - Added montage transition, handle, timeline-end, and overlapping crossfade
   metadata for deterministic edit-decision handoffs.
 - Added deterministic montage edit-decision-list handoff export.
+- Added deterministic montage manifest JSON export for agents, tests, and bridge
+  tools.
 - Added deterministic MontageAutomat handoff records with explicit owner slots
   for agent decisions, CLIP-style scoring, embeddings, temporal summaries, and
   external bridge outputs.

@@ -47,6 +47,51 @@ namespace ofxGgmlVideoUtils {
 			}
 			return stream.str();
 		}
+
+		std::string jsonEscape(const std::string & value) {
+			std::ostringstream stream;
+			for (const auto ch : value) {
+				switch (ch) {
+				case '\\':
+					stream << "\\\\";
+					break;
+				case '"':
+					stream << "\\\"";
+					break;
+				case '\n':
+					stream << "\\n";
+					break;
+				case '\r':
+					stream << "\\r";
+					break;
+				case '\t':
+					stream << "\\t";
+					break;
+				default:
+					stream << ch;
+					break;
+				}
+			}
+			return stream.str();
+		}
+
+		std::string jsonString(const std::string & value) {
+			return "\"" + jsonEscape(value) + "\"";
+		}
+
+		void writeStringArray(std::ostringstream & stream,
+		                      const std::vector<std::string> & values,
+		                      const int indent) {
+			stream << "[";
+			for (std::size_t i = 0; i < values.size(); ++i) {
+				if (i > 0) {
+					stream << ", ";
+				}
+				stream << jsonString(values[i]);
+			}
+			stream << "]";
+			(void)indent;
+		}
 	}
 
 	bool hasInput(const ofxGgmlVideoRequest & request) {
@@ -278,6 +323,73 @@ namespace ofxGgmlVideoUtils {
 				stream << "REF " << reference << "\n";
 			}
 		}
+		return stream.str();
+	}
+
+	std::string toMontageManifestJson(const ofxGgmlVideoMontagePlan & plan) {
+		if (!plan) {
+			return "";
+		}
+
+		std::ostringstream stream;
+		stream << std::fixed << std::setprecision(3);
+		stream << "{\n";
+		stream << "  \"kind\": \"ofxGgmlVideoMontageManifest\",\n";
+		stream << "  \"version\": 1,\n";
+		stream << "  \"prompt\": " << jsonString(plan.prompt) << ",\n";
+		stream << "  \"durationSeconds\": " << plan.durationSeconds << ",\n";
+		stream << "  \"options\": {\n";
+		stream << "    \"transitionKind\": " << jsonString(plan.transitionKind) << ",\n";
+		stream << "    \"transitionSeconds\": " << plan.transitionSeconds << ",\n";
+		stream << "    \"handleSeconds\": " << plan.handleSeconds << ",\n";
+		stream << "    \"overlapTransitions\": " << (plan.overlapTransitions ? "true" : "false") << "\n";
+		stream << "  },\n";
+		stream << "  \"references\": ";
+		writeStringArray(stream, plan.references, 2);
+		stream << ",\n";
+		stream << "  \"segments\": [\n";
+		for (std::size_t i = 0; i < plan.segments.size(); ++i) {
+			const auto & segment = plan.segments[i];
+			stream << "    {\n";
+			stream << "      \"index\": " << segment.index << ",\n";
+			stream << "      \"sourcePath\": " << jsonString(segment.sourcePath) << ",\n";
+			stream << "      \"label\": " << jsonString(segment.label) << ",\n";
+			stream << "      \"sourceStartSeconds\": " << segment.sourceStartSeconds << ",\n";
+			stream << "      \"sourceEndSeconds\": " << segment.sourceEndSeconds << ",\n";
+			stream << "      \"timelineStartSeconds\": " << segment.timelineStartSeconds << ",\n";
+			stream << "      \"timelineEndSeconds\": " << segment.timelineEndSeconds << ",\n";
+			stream << "      \"durationSeconds\": " << segment.durationSeconds << ",\n";
+			stream << "      \"handleInSeconds\": " << segment.handleInSeconds << ",\n";
+			stream << "      \"handleOutSeconds\": " << segment.handleOutSeconds << ",\n";
+			stream << "      \"transitionIn\": {\"kind\": " << jsonString(segment.transitionIn.kind)
+				<< ", \"durationSeconds\": " << segment.transitionIn.durationSeconds << "},\n";
+			stream << "      \"transitionOut\": {\"kind\": " << jsonString(segment.transitionOut.kind)
+				<< ", \"durationSeconds\": " << segment.transitionOut.durationSeconds << "},\n";
+			stream << "      \"tags\": ";
+			writeStringArray(stream, segment.tags, 6);
+			stream << ",\n";
+			stream << "      \"references\": ";
+			writeStringArray(stream, segment.references, 6);
+			stream << ",\n";
+			stream << "      \"frameSamples\": [";
+			for (std::size_t j = 0; j < segment.frameSamples.size(); ++j) {
+				const auto & sample = segment.frameSamples[j];
+				if (j > 0) {
+					stream << ", ";
+				}
+				stream << "{\"index\": " << sample.index
+					<< ", \"timeSeconds\": " << sample.timeSeconds
+					<< ", \"reference\": " << jsonString(sample.reference) << "}";
+			}
+			stream << "]\n";
+			stream << "    }";
+			if (i + 1 < plan.segments.size()) {
+				stream << ",";
+			}
+			stream << "\n";
+		}
+		stream << "  ]\n";
+		stream << "}\n";
 		return stream.str();
 	}
 

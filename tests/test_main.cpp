@@ -99,6 +99,18 @@ int main() {
 		return 1;
 	}
 
+	const auto manifestJson = ofxGgmlVideoUtils::toMontageManifestJson(montage);
+	if (manifestJson.find("\"kind\": \"ofxGgmlVideoMontageManifest\"") == std::string::npos ||
+		manifestJson.find("\"prompt\": \"montageautomat draft\"") == std::string::npos ||
+		manifestJson.find("\"durationSeconds\": 3.000") == std::string::npos ||
+		manifestJson.find("\"sourcePath\": \"videos/clip.mp4\"") == std::string::npos ||
+		manifestJson.find("\"timelineStartSeconds\": 2.000") == std::string::npos ||
+		manifestJson.find("\"tags\": [\"reaction\", \"closeup\"]") == std::string::npos ||
+		manifestJson.find("\"reference\": \"frame@1.000s\"") == std::string::npos) {
+		std::cerr << "montage manifest JSON did not include expected machine-readable fields\n";
+		return 1;
+	}
+
 	ofxGgmlVideoMontageOptions options;
 	options.prompt = "crossfade draft";
 	options.defaultTransitionKind = "crossfade";
@@ -122,6 +134,14 @@ int main() {
 		crossfadeEdl.find("TRANSITION IN crossfade 0.500s") == std::string::npos ||
 		ofxGgmlVideoUtils::describe(crossfadeMontage).find("handles=0.250s") == std::string::npos) {
 		std::cerr << "crossfade montage EDL or description did not include transition metadata\n";
+		return 1;
+	}
+	const auto crossfadeManifestJson = ofxGgmlVideoUtils::toMontageManifestJson(crossfadeMontage);
+	if (crossfadeManifestJson.find("\"transitionKind\": \"crossfade\"") == std::string::npos ||
+		crossfadeManifestJson.find("\"overlapTransitions\": true") == std::string::npos ||
+		crossfadeManifestJson.find("\"handleInSeconds\": 0.250") == std::string::npos ||
+		crossfadeManifestJson.find("\"transitionIn\": {\"kind\": \"crossfade\", \"durationSeconds\": 0.500}") == std::string::npos) {
+		std::cerr << "crossfade montage manifest JSON did not include transition metadata\n";
 		return 1;
 	}
 
