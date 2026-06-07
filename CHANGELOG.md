@@ -6,6 +6,7 @@
 - Added deterministic montage segment and timeline plan helpers.
 - Added montage transition, handle, timeline-end, and overlapping crossfade
   metadata for deterministic edit-decision handoffs.
+- Added deterministic beat/bar marker planning for montage timeline anchors.
 - Added deterministic montage edit-decision-list handoff export.
 - Added deterministic montage manifest JSON export for agents, tests, and bridge
   tools.

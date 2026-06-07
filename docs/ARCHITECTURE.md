@@ -20,6 +20,7 @@ No dependency should point from `ofxGgmlCore` back to `ofxGgmlVideo`.
 - edit-decision timeline segments, labels, tags, and references
 - deterministic edit-decision-list handoff text
 - deterministic machine-readable montage manifest text
+- deterministic beat and bar markers for timeline anchoring
 - frame sampling and temporal preprocessing boundaries
 - video-to-agent and video-to-vision handoff boundaries
 - CLIP-style scoring or embedding handoff metadata

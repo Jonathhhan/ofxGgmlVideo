@@ -59,6 +59,7 @@ macOS/Linux:
 - montage and video clip/frame request smoke surface
 - deterministic clip-window frame sampling helpers
 - deterministic montage timeline helpers
+- deterministic beat/bar timeline marker helper
 - deterministic edit-decision-list handoff helper
 - deterministic montage manifest helper
 - clear future path for temporal analysis and agent/CLIP/vision handoff adapters

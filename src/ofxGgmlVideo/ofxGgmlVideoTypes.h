@@ -28,11 +28,20 @@ struct ofxGgmlVideoMontageTransition {
 	double durationSeconds = 0.0;
 };
 
+struct ofxGgmlVideoMontageMarker {
+	int index = 0;
+	double timelineSeconds = 0.0;
+	std::string kind = "beat";
+	std::string label;
+};
+
 struct ofxGgmlVideoMontageOptions {
 	std::string prompt;
 	std::string defaultTransitionKind = "cut";
 	double transitionSeconds = 0.0;
 	double handleSeconds = 0.0;
+	double beatBpm = 0.0;
+	int beatsPerBar = 4;
 	bool overlapTransitions = false;
 };
 
@@ -75,8 +84,11 @@ struct ofxGgmlVideoMontagePlan {
 	double handleSeconds = 0.0;
 	double transitionSeconds = 0.0;
 	std::string transitionKind = "cut";
+	double beatBpm = 0.0;
+	int beatsPerBar = 4;
 	bool overlapTransitions = false;
 	std::vector<std::string> references;
+	std::vector<ofxGgmlVideoMontageMarker> markers;
 	std::vector<ofxGgmlVideoMontageSegment> segments;
 
 	explicit operator bool() const {

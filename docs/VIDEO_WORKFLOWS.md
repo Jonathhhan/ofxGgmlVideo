@@ -18,6 +18,7 @@ This addon may define:
 - video request/result shapes
 - montage plan, edit-decision segment, and timeline metadata shapes
 - transition, source-handle, and overlapping montage timing metadata
+- deterministic beat and bar markers for timeline anchoring
 - deterministic edit-decision-list handoff text
 - deterministic montage manifest text for agent and bridge handoff
 - frame sampling and temporal window planning
@@ -94,6 +95,7 @@ Good early video-lane tasks are:
 - documenting frame sampling and temporal-window assumptions
 - defining montage segment, timeline, and edit-decision metadata
 - adding deterministic transition or handle metadata without decoding media
+- adding deterministic beat/bar marker metadata without audio analysis
 - defining edit-decision-list export and handoff metadata
 - defining machine-readable montage manifest export metadata
 - defining MontageAutomat handoff contracts with decision owner, scoring owner,

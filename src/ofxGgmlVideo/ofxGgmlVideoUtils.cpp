@@ -17,6 +17,10 @@ namespace ofxGgmlVideoUtils {
 			return std::max(0.0, value);
 		}
 
+		int normalizedBeatsPerBar(const int beatsPerBar) {
+			return std::max(1, beatsPerBar);
+		}
+
 		std::string normalizedTransitionKind(const std::string & kind) {
 			return kind.empty() ? "cut" : kind;
 		}
@@ -141,6 +145,10 @@ namespace ofxGgmlVideoUtils {
 		if (plan.handleSeconds > 0.0) {
 			description << " handles=" << formatSeconds(plan.handleSeconds);
 		}
+		if (plan.beatBpm > 0.0 && !plan.markers.empty()) {
+			description << " markers=" << plan.markers.size()
+				<< " bpm=" << std::fixed << std::setprecision(1) << plan.beatBpm;
+		}
 		if (!plan.prompt.empty()) {
 			description << " prompt=\"" << plan.prompt << "\"";
 		}
@@ -166,6 +174,30 @@ namespace ofxGgmlVideoUtils {
 		}
 
 		return samples;
+	}
+
+	std::vector<ofxGgmlVideoMontageMarker> planBeatMarkers(const double durationSeconds, const double bpm, const int beatsPerBar) {
+		std::vector<ofxGgmlVideoMontageMarker> markers;
+		if (durationSeconds <= 0.0 || bpm <= 0.0) {
+			return markers;
+		}
+
+		const auto normalizedBeats = normalizedBeatsPerBar(beatsPerBar);
+		const auto beatDuration = 60.0 / bpm;
+		const auto markerCount = std::max(1, static_cast<int>(std::ceil(durationSeconds / beatDuration)));
+		markers.reserve(static_cast<std::size_t>(markerCount));
+		for (int i = 0; i < markerCount; ++i) {
+			ofxGgmlVideoMontageMarker marker;
+			marker.index = i;
+			marker.timelineSeconds = static_cast<double>(i) * beatDuration;
+			const auto isBar = i % normalizedBeats == 0;
+			marker.kind = isBar ? "bar" : "beat";
+			marker.label = isBar
+				? "bar " + std::to_string((i / normalizedBeats) + 1)
+				: "beat " + std::to_string(i + 1);
+			markers.push_back(marker);
+		}
+		return markers;
 	}
 
 	ofxGgmlVideoResult planClip(const ofxGgmlVideoRequest & request) {
@@ -242,6 +274,8 @@ namespace ofxGgmlVideoUtils {
 		plan.handleSeconds = clampNonNegative(options.handleSeconds);
 		plan.transitionSeconds = clampNonNegative(options.transitionSeconds);
 		plan.transitionKind = normalizedTransitionKind(options.defaultTransitionKind);
+		plan.beatBpm = clampNonNegative(options.beatBpm);
+		plan.beatsPerBar = normalizedBeatsPerBar(options.beatsPerBar);
 		plan.overlapTransitions = options.overlapTransitions;
 		if (requests.empty()) {
 			plan.error = "video: empty montage";
@@ -283,6 +317,7 @@ namespace ofxGgmlVideoUtils {
 
 		plan.success = true;
 		plan.durationSeconds = timelineStartSeconds;
+		plan.markers = planBeatMarkers(plan.durationSeconds, plan.beatBpm, plan.beatsPerBar);
 		plan.text = describe(plan);
 		return plan;
 	}
@@ -295,6 +330,13 @@ namespace ofxGgmlVideoUtils {
 		std::ostringstream stream;
 		stream << "TITLE " << (plan.prompt.empty() ? "ofxGgmlVideo montage" : plan.prompt) << "\n";
 		stream << "DURATION " << formatSeconds(plan.durationSeconds) << "\n";
+		for (const auto & marker : plan.markers) {
+			stream << "MARKER " << std::setw(3) << std::setfill('0') << marker.index << std::setfill(' ')
+				<< " " << formatSeconds(marker.timelineSeconds)
+				<< " " << marker.kind
+				<< " " << marker.label
+				<< "\n";
+		}
 		for (const auto & segment : plan.segments) {
 			stream << "SEGMENT " << std::setw(3) << std::setfill('0') << segment.index << std::setfill(' ')
 				<< " TL " << formatSeconds(segment.timelineStartSeconds)
@@ -342,11 +384,25 @@ namespace ofxGgmlVideoUtils {
 		stream << "    \"transitionKind\": " << jsonString(plan.transitionKind) << ",\n";
 		stream << "    \"transitionSeconds\": " << plan.transitionSeconds << ",\n";
 		stream << "    \"handleSeconds\": " << plan.handleSeconds << ",\n";
+		stream << "    \"beatBpm\": " << plan.beatBpm << ",\n";
+		stream << "    \"beatsPerBar\": " << plan.beatsPerBar << ",\n";
 		stream << "    \"overlapTransitions\": " << (plan.overlapTransitions ? "true" : "false") << "\n";
 		stream << "  },\n";
 		stream << "  \"references\": ";
 		writeStringArray(stream, plan.references, 2);
 		stream << ",\n";
+		stream << "  \"markers\": [";
+		for (std::size_t i = 0; i < plan.markers.size(); ++i) {
+			const auto & marker = plan.markers[i];
+			if (i > 0) {
+				stream << ", ";
+			}
+			stream << "{\"index\": " << marker.index
+				<< ", \"timelineSeconds\": " << marker.timelineSeconds
+				<< ", \"kind\": " << jsonString(marker.kind)
+				<< ", \"label\": " << jsonString(marker.label) << "}";
+		}
+		stream << "],\n";
 		stream << "  \"segments\": [\n";
 		for (std::size_t i = 0; i < plan.segments.size(); ++i) {
 			const auto & segment = plan.segments[i];

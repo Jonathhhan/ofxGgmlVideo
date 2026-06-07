@@ -50,6 +50,16 @@ int main() {
 		return 1;
 	}
 
+	const auto beatMarkers = ofxGgmlVideoUtils::planBeatMarkers(2.0, 120.0, 4);
+	if (beatMarkers.size() != 4 ||
+		beatMarkers[0].kind != "bar" ||
+		beatMarkers[0].label != "bar 1" ||
+		beatMarkers[1].timelineSeconds != 0.5 ||
+		beatMarkers[1].kind != "beat") {
+		std::cerr << "beat marker plan did not include expected bar and beat markers\n";
+		return 1;
+	}
+
 	const auto clipPlan = ofxGgmlVideoUtils::planClip(request);
 	if (!clipPlan ||
 		clipPlan.frameSamples.size() != samples.size() ||
@@ -116,11 +126,15 @@ int main() {
 	options.defaultTransitionKind = "crossfade";
 	options.transitionSeconds = 0.5;
 	options.handleSeconds = 0.25;
+	options.beatBpm = 120.0;
+	options.beatsPerBar = 4;
 	options.overlapTransitions = true;
 	const auto crossfadeMontage = ofxGgmlVideoUtils::planMontage({request, cutaway}, options);
 	if (!crossfadeMontage ||
 		crossfadeMontage.durationSeconds != 2.5 ||
 		crossfadeMontage.transitionKind != "crossfade" ||
+		crossfadeMontage.markers.size() != 5 ||
+		crossfadeMontage.markers[4].label != "bar 2" ||
 		crossfadeMontage.segments[0].timelineEndSeconds != 2.0 ||
 		crossfadeMontage.segments[1].timelineStartSeconds != 1.5 ||
 		crossfadeMontage.segments[0].transitionOut.durationSeconds != 0.5 ||
@@ -132,6 +146,7 @@ int main() {
 	const auto crossfadeEdl = ofxGgmlVideoUtils::toMontageEdl(crossfadeMontage);
 	if (crossfadeEdl.find("TRANSITION OUT crossfade 0.500s") == std::string::npos ||
 		crossfadeEdl.find("TRANSITION IN crossfade 0.500s") == std::string::npos ||
+		crossfadeEdl.find("MARKER 004 2.000s bar bar 2") == std::string::npos ||
 		ofxGgmlVideoUtils::describe(crossfadeMontage).find("handles=0.250s") == std::string::npos) {
 		std::cerr << "crossfade montage EDL or description did not include transition metadata\n";
 		return 1;
@@ -139,6 +154,8 @@ int main() {
 	const auto crossfadeManifestJson = ofxGgmlVideoUtils::toMontageManifestJson(crossfadeMontage);
 	if (crossfadeManifestJson.find("\"transitionKind\": \"crossfade\"") == std::string::npos ||
 		crossfadeManifestJson.find("\"overlapTransitions\": true") == std::string::npos ||
+		crossfadeManifestJson.find("\"beatBpm\": 120.000") == std::string::npos ||
+		crossfadeManifestJson.find("\"markers\": [{\"index\": 0, \"timelineSeconds\": 0.000, \"kind\": \"bar\", \"label\": \"bar 1\"}") == std::string::npos ||
 		crossfadeManifestJson.find("\"handleInSeconds\": 0.250") == std::string::npos ||
 		crossfadeManifestJson.find("\"transitionIn\": {\"kind\": \"crossfade\", \"durationSeconds\": 0.500}") == std::string::npos) {
 		std::cerr << "crossfade montage manifest JSON did not include transition metadata\n";

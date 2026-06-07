@@ -12,6 +12,7 @@ namespace ofxGgmlVideoUtils {
 	std::string describe(const ofxGgmlVideoRequest & request);
 	std::string describe(const ofxGgmlVideoMontagePlan & plan);
 	std::vector<ofxGgmlVideoFrameSample> planFrameSamples(const ofxGgmlVideoTemporalWindow & window);
+	std::vector<ofxGgmlVideoMontageMarker> planBeatMarkers(double durationSeconds, double bpm, int beatsPerBar = 4);
 	ofxGgmlVideoResult planClip(const ofxGgmlVideoRequest & request);
 	ofxGgmlVideoMontageSegment makeMontageSegment(const ofxGgmlVideoRequest & request, int index, double timelineStartSeconds);
 	ofxGgmlVideoMontageSegment makeMontageSegment(const ofxGgmlVideoRequest & request, int index, double timelineStartSeconds, const ofxGgmlVideoMontageOptions & options);

@@ -34,6 +34,8 @@ void ofApp::setup() {
 	montageOptions.defaultTransitionKind = "crossfade";
 	montageOptions.transitionSeconds = 0.5;
 	montageOptions.handleSeconds = 0.25;
+	montageOptions.beatBpm = 120.0;
+	montageOptions.beatsPerBar = 4;
 	montageOptions.overlapTransitions = true;
 
 	rebuildMontage();
@@ -88,6 +90,8 @@ void ofApp::drawClipControls() {
 	ImGui::TextUnformatted("Montage options");
 	float transitionSeconds = static_cast<float>(montageOptions.transitionSeconds);
 	float handleSeconds = static_cast<float>(montageOptions.handleSeconds);
+	float beatBpm = static_cast<float>(montageOptions.beatBpm);
+	int beatsPerBar = montageOptions.beatsPerBar;
 	bool overlapTransitions = montageOptions.overlapTransitions;
 	const char * transitionKinds[] = {"cut", "crossfade", "dip", "wipe"};
 	int transitionIndex = 0;
@@ -100,10 +104,14 @@ void ofApp::drawClipControls() {
 	changed |= ImGui::Combo("transition", &transitionIndex, transitionKinds, 4);
 	changed |= ImGui::DragFloat("transition duration", &transitionSeconds, 0.05f, 0.0f, 10.0f, "%.2fs");
 	changed |= ImGui::DragFloat("source handles", &handleSeconds, 0.05f, 0.0f, 30.0f, "%.2fs");
+	changed |= ImGui::DragFloat("beat bpm", &beatBpm, 1.0f, 0.0f, 300.0f, "%.1f");
+	changed |= ImGui::SliderInt("beats per bar", &beatsPerBar, 1, 16);
 	changed |= ImGui::Checkbox("overlap transitions", &overlapTransitions);
 	montageOptions.defaultTransitionKind = transitionKinds[transitionIndex];
 	montageOptions.transitionSeconds = transitionSeconds;
 	montageOptions.handleSeconds = handleSeconds;
+	montageOptions.beatBpm = beatBpm;
+	montageOptions.beatsPerBar = beatsPerBar;
 	montageOptions.overlapTransitions = overlapTransitions;
 
 	ImGui::Separator();
@@ -153,6 +161,15 @@ void ofApp::drawTimeline() {
 	const float scale = montagePlan.durationSeconds > 0.0
 		? usableWidth / static_cast<float>(montagePlan.durationSeconds)
 		: usableWidth;
+
+	for (const auto & marker : montagePlan.markers) {
+		const float x = canvasPos.x + 12.0f + static_cast<float>(marker.timelineSeconds) * scale;
+		const ImU32 color = marker.kind == "bar" ? IM_COL32(255, 255, 255, 150) : IM_COL32(180, 190, 200, 80);
+		drawList->AddLine(ImVec2(x, canvasPos.y + 8.0f), ImVec2(x, canvasPos.y + canvasSize.y - 8.0f), color, marker.kind == "bar" ? 2.0f : 1.0f);
+		if (marker.kind == "bar") {
+			drawList->AddText(ImVec2(x + 3.0f, canvasPos.y + 4.0f), IM_COL32(255, 255, 255, 210), marker.label.c_str());
+		}
+	}
 
 	for (const auto & segment : montagePlan.segments) {
 		const float x = canvasPos.x + 12.0f + static_cast<float>(segment.timelineStartSeconds) * scale;

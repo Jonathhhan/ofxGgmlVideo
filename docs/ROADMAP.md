@@ -8,6 +8,7 @@
 - Add deterministic clip-window frame sampling helpers.
 - Add deterministic montage segment and timeline plan helpers.
 - Add transition, handle, and overlapping timeline metadata for montage plans.
+- Add deterministic beat/bar timeline marker helpers.
 - Add deterministic edit-decision-list handoff helpers.
 - Add deterministic machine-readable montage manifest helpers.
 - Add deterministic MontageAutomat handoff contracts for agent decisions,

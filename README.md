@@ -34,9 +34,9 @@ Current addon API version: `1.0.1`.
 
 `ofxGgmlVideoMontageExample` is a root-level MontageAutomat substrate example.
 It shows clip-window controls, deterministic frame references, ordered montage
-segments, transition and handle controls, a simple timeline preview, and an
-edit-decision-list plus machine-readable manifest handoff without claiming
-autonomous editing or media decoding.
+segments, transition and handle controls, beat-marker controls, a simple
+timeline preview, and an edit-decision-list plus machine-readable manifest
+handoff without claiming autonomous editing or media decoding.
 
 For video-lane planning, temporal boundaries, and generated media rules, see
 [docs/VIDEO_WORKFLOWS.md](docs/VIDEO_WORKFLOWS.md).
@@ -69,6 +69,10 @@ transition duration, source-handle duration, and optional overlapping timeline
 placement for crossfade-style handoffs. The generated EDL includes source and
 timeline ranges, handles, transition hints, tags, and frame references without
 creating media.
+
+Beat markers can be generated from BPM and beats-per-bar values. They are
+timeline anchors only; audio analysis and beat detection belong in audio/music
+lanes or the app layer.
 
 `ofxGgmlVideoUtils::toMontageManifestJson()` creates deterministic JSON-shaped
 manifest text for agents, tests, and bridge tools that need structured segment
