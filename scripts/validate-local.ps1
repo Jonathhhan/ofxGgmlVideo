@@ -95,6 +95,8 @@ Assert-Path (Join-Path $scriptRoot "run-video-runtime-smoke.ps1") "Video runtime
 Assert-Path (Join-Path $scriptRoot "run-video-runtime-smoke.bat") "Video runtime smoke Windows wrapper"
 Assert-Path (Join-Path $scriptRoot "run-video-runtime-smoke.sh") "Video runtime smoke shell wrapper"
 Assert-Path (Join-Path $scriptRoot "test-video-runtime-smoke.ps1") "Video runtime smoke contract test"
+Assert-Path (Join-Path $scriptRoot "run-model-informed-montage-smoke.ps1") "model-informed montage smoke"
+Assert-Path (Join-Path $scriptRoot "run-model-informed-montage-smoke.bat") "model-informed montage smoke Windows wrapper"
 
 $nestedExamples = Join-Path $addonRoot "examples"
 if (Test-Path -LiteralPath $nestedExamples -PathType Container) {

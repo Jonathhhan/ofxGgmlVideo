@@ -95,6 +95,21 @@ or sequence-generation inference. Add model-backed checks here only after the
 local backend, model paths, input media, generated frame/video outputs, and
 cleanup contract are explicit.
 
+For a real model-informed montage decision over extracted or prepared frames,
+run the Vision-backed ranking smoke with at least two images:
+
+```powershell
+scripts\run-model-informed-montage-smoke.ps1 `
+  -Images frame-a.png,frame-b.png `
+  -MontagePrompt "red energetic abstract opening" `
+  -VisionModel moondream:latest `
+  -Json
+```
+
+Vision supplies observable frame descriptions. Video then ranks their explicit
+prompt-token overlap deterministically and emits ordered timeline segments.
+This path does not require or activate `ofxGgmlAgents`.
+
 ## Boundary
 
 Keep video-specific decoding, frame sampling, temporal preprocessing and
