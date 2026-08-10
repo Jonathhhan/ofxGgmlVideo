@@ -119,7 +119,16 @@ $forbidden = @(
 foreach ($relative in $forbidden) {
 	$path = Join-Path $addonRoot $relative
 	if (Test-Path -LiteralPath $path) {
-		throw "Generated or local-only path should not be committed here: $relative"
+		$gitPath = $relative.Replace("\", "/")
+		$tracked = @(& git -C $addonRoot ls-files -- $gitPath "$gitPath/**")
+		if ($tracked.Count -gt 0) {
+			throw "Generated or local-only path is tracked by Git: $relative"
+		}
+
+		& git -C $addonRoot check-ignore -q -- "$gitPath/"
+		if ($LASTEXITCODE -ne 0) {
+			throw "Generated or local-only path is not ignored by Git: $relative"
+		}
 	}
 }
 
