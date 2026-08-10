@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Consolidated the redundant single-request frame example into
+  `ofxGgmlVideoMontageExample`, which already exposes the same temporal sampling
+  inputs and frame references alongside the complete montage workflow.
 - Added deterministic clip-window frame sampling helpers.
 - Added deterministic montage segment and timeline plan helpers.
 - Added montage transition, handle, timeline-end, and overlapping crossfade
@@ -13,8 +16,6 @@
 - Added deterministic MontageAutomat handoff records with explicit owner slots
   for agent decisions, CLIP-style scoring, embeddings, temporal summaries, and
   external bridge outputs.
-- Updated the frame smoke example to show a MontageAutomat-style plan for later
-  agent and vision/CLIP handoff.
 - Added `ofxGgmlVideoMontageExample` as a root-level ImGui montage substrate
   example.
 - Clarified that agentic edit decisions belong above this addon in

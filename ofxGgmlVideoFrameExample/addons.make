@@ -1,3 +1,0 @@
-ofxGgmlCore
-ofxGgmlVideo
-ofxImGui

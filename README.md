@@ -24,19 +24,27 @@ Current addon API version: `1.0.1`.
 - define small request/result types
 - define deterministic clip-window and frame-sampling helpers
 - define deterministic montage segment and plan helpers
-- keep one root-level smoke example
+- keep one canonical root-level montage example
 - keep generated models, media, builds, and IDE files out of git
 - validate the addon with local headless tests
 
 ## Example
 
-`ofxGgmlVideoFrameExample` is a root-level video request smoke test. Generate it with the openFrameworks projectGenerator using addons `ofxGgmlVideo`, `ofxGgmlCore`, and `ofxImGui`.
-
-`ofxGgmlVideoMontageExample` is a root-level MontageAutomat substrate example.
+`ofxGgmlVideoMontageExample` is the canonical root-level video request and
+MontageAutomat substrate example. Generate it with the openFrameworks
+projectGenerator using addons `ofxGgmlVideo`, `ofxGgmlCore`, and `ofxImGui`.
 It shows clip-window controls, deterministic frame references, ordered montage
 segments, transition and handle controls, beat-marker controls, a simple
 timeline preview, and an edit-decision-list plus machine-readable manifest
 handoff without claiming autonomous editing or media decoding.
+
+The example subsumes the former single-request frame smoke: every clip exposes
+its temporal start, duration, sample rate, and maximum frame count, and every
+planned segment displays the resulting frame references. Headless helper
+coverage remains in `tests/` and `scripts/run-video-runtime-smoke.*`. Real
+captions remain a model-backed boundary exercised by
+`scripts/run-model-informed-montage-smoke.*` against a vision-capable
+OpenAI-compatible server; the GUI does not simulate captions.
 
 For video-lane planning, temporal boundaries, and generated media rules, see
 [docs/VIDEO_WORKFLOWS.md](docs/VIDEO_WORKFLOWS.md).

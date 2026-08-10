@@ -100,16 +100,6 @@ $checks += Test-PathCheck `
 	-Directory
 
 $checks += Test-PathCheck `
-	-Path (Join-Path $addonRoot "ofxGgmlVideoFrameExample\addons.make") `
-	-Name "frame example" `
-	-MissingDetail "ofxGgmlVideoFrameExample skeleton is missing"
-
-$checks += Test-PathCheck `
-	-Path (Join-Path $addonRoot "ofxGgmlVideoFrameExample\src\ofApp.cpp") `
-	-Name "frame example source" `
-	-MissingDetail "frame example source is missing"
-
-$checks += Test-PathCheck `
 	-Path (Join-Path $addonRoot "ofxGgmlVideoMontageExample\addons.make") `
 	-Name "montage example" `
 	-MissingDetail "ofxGgmlVideoMontageExample skeleton is missing"
@@ -143,9 +133,6 @@ $artifactWarnings = @()
 foreach ($relative in @(
 	"build",
 	".vs",
-	"ofxGgmlVideoFrameExample\bin",
-	"ofxGgmlVideoFrameExample\obj",
-	"ofxGgmlVideoFrameExample\.vs",
 	"ofxGgmlVideoMontageExample\bin",
 	"ofxGgmlVideoMontageExample\obj",
 	"ofxGgmlVideoMontageExample\.vs",

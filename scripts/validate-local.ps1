@@ -66,14 +66,6 @@ Assert-Path (Join-Path $addonsRoot "ofxGgmlCore") "sibling ofxGgmlCore addon" -D
 Assert-Path (Join-Path $addonsRoot "ofxImGui") "sibling ofxImGui addon for examples" -Directory
 
 Write-Step "Checking example layout"
-$exampleRoot = Join-Path $addonRoot "ofxGgmlVideoFrameExample"
-Assert-Path $exampleRoot "root-level smoke example" -Directory
-Assert-Path (Join-Path $exampleRoot "addons.make") "smoke example addons.make"
-Assert-FileContains (Join-Path $exampleRoot "addons.make") "(?m)^ofxImGui\s*$" "smoke example addons.make"
-Assert-Path (Join-Path $exampleRoot "src\main.cpp") "smoke example main.cpp"
-Assert-Path (Join-Path $exampleRoot "src\ofApp.h") "smoke example ofApp.h"
-Assert-Path (Join-Path $exampleRoot "src\ofApp.cpp") "smoke example ofApp.cpp"
-
 $montageExampleRoot = Join-Path $addonRoot "ofxGgmlVideoMontageExample"
 Assert-Path $montageExampleRoot "root-level montage example" -Directory
 Assert-Path (Join-Path $montageExampleRoot "addons.make") "montage example addons.make"
@@ -84,6 +76,8 @@ Assert-Path (Join-Path $montageExampleRoot "src\ofApp.cpp") "montage example ofA
 Assert-FileContains (Join-Path $montageExampleRoot "src\ofApp.cpp") "transition duration" "montage example transition controls"
 Assert-FileContains (Join-Path $montageExampleRoot "src\ofApp.cpp") "overlap transitions" "montage example overlap controls"
 Assert-FileContains (Join-Path $montageExampleRoot "src\ofApp.cpp") "Montage Handoff" "montage example handoff panel"
+Assert-FileContains (Join-Path $montageExampleRoot "src\ofApp.cpp") "sample fps" "montage example frame sampling controls"
+Assert-FileContains (Join-Path $montageExampleRoot "src\ofApp.cpp") "frame references" "montage example frame references"
 
 Assert-Path (Join-Path $addonRoot "tests\CMakeLists.txt") "test CMakeLists"
 Assert-Path (Join-Path $addonRoot "tests\test_main.cpp") "test source"
@@ -107,9 +101,6 @@ Write-Step "Checking generated artifact hygiene"
 $forbidden = @(
 	"build",
 	".vs",
-	"ofxGgmlVideoFrameExample\bin",
-	"ofxGgmlVideoFrameExample\obj",
-	"ofxGgmlVideoFrameExample\.vs",
 	"ofxGgmlVideoMontageExample\bin",
 	"ofxGgmlVideoMontageExample\obj",
 	"ofxGgmlVideoMontageExample\.vs",

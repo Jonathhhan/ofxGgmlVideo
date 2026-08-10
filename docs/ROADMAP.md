@@ -3,7 +3,8 @@
 ## Current Milestone
 
 - Seed the companion addon skeleton.
-- Keep `ofxGgmlVideoFrameExample` as the first root-level smoke example.
+- Keep `ofxGgmlVideoMontageExample` as the single canonical root-level example,
+  including clip-window frame sampling and montage handoff inspection.
 - Keep `ofxGgmlCore` as the only required library dependency; examples may depend on `ofxImGui`.
 - Add deterministic clip-window frame sampling helpers.
 - Add deterministic montage segment and timeline plan helpers.

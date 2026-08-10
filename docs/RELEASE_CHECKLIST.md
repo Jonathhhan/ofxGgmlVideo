@@ -51,18 +51,22 @@ macOS/Linux:
 
 ## Example Scope
 
-`ofxGgmlVideoFrameExample` is intentionally narrow in this release:
+`ofxGgmlVideoMontageExample` is the single canonical example:
 
 - root-level openFrameworks example
-- root-level montage workflow example
 - `ofxImGui` dependency declared in `addons.make`
 - montage and video clip/frame request smoke surface
+- editable clip-window sampling controls and visible frame references
 - deterministic clip-window frame sampling helpers
 - deterministic montage timeline helpers
 - deterministic beat/bar timeline marker helper
 - deterministic edit-decision-list handoff helper
 - deterministic montage manifest helper
 - clear future path for temporal analysis and agent/CLIP/vision handoff adapters
+
+Real captioning is verified separately by the model-informed montage smoke
+against a vision-capable OpenAI-compatible server. The deterministic GUI and
+headless helper tests do not claim model inference.
 
 This release does not promise a complete model-backed video runtime.
 

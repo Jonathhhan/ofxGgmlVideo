@@ -12,7 +12,7 @@ $text = $output -join "`n"
 foreach ($expected in @(
 	"ofxGgmlVideo doctor",
 	"ofxGgmlCore sibling",
-	"frame example",
+	"montage example",
 	"video request types",
 	"video input",
 	"artifact hygiene"
