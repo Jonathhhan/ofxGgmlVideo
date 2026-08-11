@@ -44,7 +44,11 @@ planned segment displays the resulting frame references. Headless helper
 coverage remains in `tests/` and `scripts/run-video-runtime-smoke.*`. Real
 captions remain a model-backed boundary exercised by
 `scripts/run-model-informed-montage-smoke.*` against a vision-capable
-OpenAI-compatible server; the GUI does not simulate captions.
+OpenAI-compatible server; the GUI does not simulate captions. The GUI defaults
+to local llama.cpp inference: choose the Vision-model GGUF and its matching
+`mmproj` GGUF with file dialogs, then start a Vision-ranked render. The workflow
+reuses `ofxGgmlVision` to launch the CUDA-backed local server. An external
+OpenAI-compatible Vision server remains available through an explicit checkbox.
 
 For video-lane planning, temporal boundaries, and generated media rules, see
 [docs/VIDEO_WORKFLOWS.md](docs/VIDEO_WORKFLOWS.md).

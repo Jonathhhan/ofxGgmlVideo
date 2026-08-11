@@ -1,8 +1,31 @@
 #include "ofApp.h"
 
+#include "ImHelpers.h"
+#include "imgui_stdlib.h"
+
 #include <algorithm>
+#include <chrono>
+#include <cstdlib>
+#include <filesystem>
+#include <sstream>
 
 namespace {
+	std::string getEnvironmentValue(const char * name) {
+#ifdef TARGET_WIN32
+		char * value = nullptr;
+		size_t valueLength = 0;
+		if (_dupenv_s(&value, &valueLength, name) != 0 || value == nullptr) {
+			return {};
+		}
+		const std::string result(value);
+		std::free(value);
+		return result;
+#else
+		const char * value = std::getenv(name);
+		return value == nullptr ? std::string{} : std::string(value);
+#endif
+	}
+
 	ofxGgmlVideoRequest makeClip(const std::string & path,
 	                             const std::string & label,
 	                             const double startSeconds,
@@ -23,8 +46,27 @@ namespace {
 }
 
 void ofApp::setup() {
+	// ofxImGui::AddImage only accepts normalized GL_TEXTURE_2D textures.
+	// Set the openFrameworks allocation mode before ofVideoPlayer loads a frame.
+	ofDisableArbTex();
 	ofSetWindowTitle("ofxGgmlVideo montage example");
 	gui.setup(nullptr, false);
+	const auto addonRoot = std::filesystem::path(__FILE__).parent_path().parent_path().parent_path();
+	workflowScript = (addonRoot / "scripts" / "run-video-montage-workflow.ps1").string();
+	if (const auto configuredModel = getEnvironmentValue("OFXGGML_VISION_SERVER_MODEL"); !configuredModel.empty()) {
+		visionModel = configuredModel;
+		useExternalVisionServer = true;
+	}
+	if (const auto configuredServer = getEnvironmentValue("OFXGGML_VISION_SERVER_URL"); !configuredServer.empty()) {
+		visionServerUrl = configuredServer;
+	}
+	if (const auto configuredModelPath = getEnvironmentValue("OFXGGML_VISION_MODEL"); !configuredModelPath.empty()) {
+		visionModelPath = configuredModelPath;
+		useExternalVisionServer = false;
+	}
+	if (const auto configuredMmprojPath = getEnvironmentValue("OFXGGML_VISION_MMPROJ"); !configuredMmprojPath.empty()) {
+		visionMmprojPath = configuredMmprojPath;
+	}
 
 	clips.push_back(makeClip("videos/interview.mp4", "opening statement", 4.0, 3.0, 1.0, 3, {"dialog", "select"}));
 	clips.push_back(makeClip("videos/broll.mp4", "hands and process", 18.0, 4.0, 1.0, 4, {"broll", "texture"}));
@@ -39,6 +81,148 @@ void ofApp::setup() {
 	montageOptions.overlapTransitions = true;
 
 	rebuildMontage();
+}
+
+void ofApp::update() {
+	if (videoLoaded) {
+		videoPlayer.update();
+	}
+	if (renderRunning && renderFuture.valid() &&
+		renderFuture.wait_for(std::chrono::milliseconds(0)) == std::future_status::ready) {
+		const int exitCode = renderFuture.get();
+		renderRunning = false;
+		if (exitCode == 0 && ofFile::doesFileExist(renderOutputPath)) {
+			renderStatus = "Rendered MP4: " + renderOutputPath;
+			ofLogNotice("ofxGgmlVideoMontageExample") << renderStatus;
+		} else {
+			renderStatus = "Render failed with exit code " + ofToString(exitCode) + ". See the console for the first FFmpeg or Vision error.";
+			ofLogError("ofxGgmlVideoMontageExample") << renderStatus;
+		}
+	}
+}
+
+bool ofApp::loadVideo(const std::string & path) {
+	videoPlayer.close();
+	if (!videoPlayer.load(path)) {
+		videoLoaded = false;
+		renderStatus = "Could not decode video: " + path;
+		ofLogError("ofxGgmlVideoMontageExample") << renderStatus;
+		return false;
+	}
+
+	videoPath = ofFilePath::getAbsolutePath(path);
+	videoLoaded = true;
+	videoPaused = false;
+	videoPlayer.setLoopState(OF_LOOP_NORMAL);
+	videoPlayer.play();
+	const double sourceDuration = std::max(0.1, static_cast<double>(videoPlayer.getDuration()));
+	const double clipDuration = std::min(4.0, std::max(0.5, sourceDuration / 6.0));
+	clips.clear();
+	for (int index = 0; index < 3; ++index) {
+		const double center = (static_cast<double>(index) + 0.5) * sourceDuration / 3.0;
+		const double start = std::max(0.0, std::min(sourceDuration - clipDuration, center - clipDuration / 2.0));
+		clips.push_back(makeClip(videoPath,
+			"sample " + ofToString(index + 1),
+			start,
+			clipDuration,
+			1.0,
+			4,
+			{"decoded-video", "sample"}));
+	}
+	const std::filesystem::path inputPath(videoPath);
+	renderOutputPath = (inputPath.parent_path() / (inputPath.stem().string() + ".montage.mp4")).string();
+	renderStatus = "Loaded " + videoPath + " (" + ofToString(sourceDuration, 2) + "s).";
+	rebuildMontage();
+	return true;
+}
+
+void ofApp::chooseVideo() {
+	auto result = ofSystemLoadDialog("Choose a video for the montage workflow", false);
+	if (result.bSuccess) {
+		loadVideo(result.getPath());
+	}
+}
+
+void ofApp::chooseVisionModel() {
+	auto result = ofSystemLoadDialog("Choose local Vision model GGUF", false, visionModelPath);
+	if (result.bSuccess) {
+		visionModelPath = result.getPath();
+		useExternalVisionServer = false;
+		renderStatus = "Selected local Vision model: " + visionModelPath;
+	}
+}
+
+void ofApp::chooseVisionMmproj() {
+	auto result = ofSystemLoadDialog("Choose matching Vision mmproj GGUF", false, visionMmprojPath);
+	if (result.bSuccess) {
+		visionMmprojPath = result.getPath();
+		useExternalVisionServer = false;
+		renderStatus = "Selected local Vision projector: " + visionMmprojPath;
+	}
+}
+
+void ofApp::dragEvent(ofDragInfo dragInfo) {
+	if (!dragInfo.files.empty()) {
+		loadVideo(dragInfo.files.front().string());
+	}
+}
+
+void ofApp::startRender(const bool modelBacked) {
+	if (!videoLoaded || renderRunning) {
+		return;
+	}
+	if (!ofFile::doesFileExist(workflowScript)) {
+		renderStatus = "Workflow script was not found: " + workflowScript;
+		ofLogError("ofxGgmlVideoMontageExample") << renderStatus;
+		return;
+	}
+	if (modelBacked) {
+		if (useExternalVisionServer && visionModel.empty()) {
+			renderStatus = "Enter the external Vision model ID before starting a model-ranked render.";
+			return;
+		}
+		if (!useExternalVisionServer && !ofFile::doesFileExist(visionModelPath)) {
+			renderStatus = "Choose a readable local Vision model GGUF first.";
+			return;
+		}
+		if (!useExternalVisionServer && !ofFile::doesFileExist(visionMmprojPath)) {
+			renderStatus = "Choose the matching local Vision mmproj GGUF first.";
+			return;
+		}
+	}
+
+	auto quote = [](std::string value) {
+		std::replace(value.begin(), value.end(), '"', '\'');
+		return "\"" + value + "\"";
+	};
+	std::ostringstream command;
+	command << "powershell.exe -NoProfile -ExecutionPolicy Bypass -File " << quote(workflowScript)
+		<< " -Video " << quote(videoPath)
+		<< " -OutputPath " << quote(renderOutputPath)
+		<< " -MontagePrompt " << quote(montageOptions.prompt)
+		<< " -SampleCount 6 -MaxOutputSegments 4 -SegmentDurationSeconds 2";
+	if (modelBacked) {
+		if (useExternalVisionServer) {
+			command << " -VisionModel " << quote(visionModel)
+				<< " -VisionServerUrl " << quote(visionServerUrl);
+		} else {
+			command << " -VisionModelPath " << quote(visionModelPath)
+				<< " -VisionMmprojPath " << quote(visionMmprojPath);
+		}
+	} else {
+		command << " -SkipVision";
+	}
+
+	renderStatus = modelBacked
+		? (useExternalVisionServer
+			? "External Vision ranking and MP4 render running..."
+			: "Local CUDA Vision ranking and MP4 render running...")
+		: "Deterministic MP4 render running...";
+	renderRunning = true;
+	const std::string commandText = command.str();
+	renderFuture = std::async(std::launch::async, [commandText]() {
+		return std::system(commandText.c_str());
+	});
 }
 
 void ofApp::rebuildMontage() {
@@ -60,6 +244,8 @@ void ofApp::draw() {
 	ImGui::SetNextWindowSize(ImVec2(760.0f, 640.0f), ImGuiCond_Once);
 	if (ImGui::Begin("ofxGgmlVideo Montage Example")) {
 		ImGui::TextWrapped("%s", status.c_str());
+		ImGui::Separator();
+		drawVideoInput();
 		ImGui::Separator();
 		drawClipControls();
 		ImGui::Separator();
@@ -85,9 +271,69 @@ void ofApp::draw() {
 	gui.draw();
 }
 
+void ofApp::drawVideoInput() {
+	ImGui::TextUnformatted("User video workflow");
+	if (ImGui::Button("Choose video...")) {
+		chooseVideo();
+	}
+	ImGui::SameLine();
+	ImGui::TextWrapped("%s", videoLoaded ? videoPath.c_str() : "Drop an MP4, MOV, or other FFmpeg/openFrameworks-readable video onto the window.");
+
+	if (videoLoaded) {
+		const float sourceWidth = std::max(1.0f, videoPlayer.getWidth());
+		const float sourceHeight = std::max(1.0f, videoPlayer.getHeight());
+		const float previewWidth = std::min(520.0f, ImGui::GetContentRegionAvail().x);
+		const float previewHeight = previewWidth * sourceHeight / sourceWidth;
+		if (videoPlayer.getTexture().isAllocated()) {
+			ofxImGui::AddImage(videoPlayer.getTexture(), glm::vec2(previewWidth, previewHeight));
+		}
+		float position = videoPlayer.getPosition();
+		if (ImGui::SliderFloat("preview position", &position, 0.0f, 1.0f, "%.3f")) {
+			videoPlayer.setPosition(position);
+		}
+		if (ImGui::Button(videoPaused ? "Play preview" : "Pause preview")) {
+			videoPaused = !videoPaused;
+			videoPlayer.setPaused(videoPaused);
+		}
+		ImGui::SameLine();
+		ImGui::Text("%.2fs / %.2fs", videoPlayer.getPosition() * videoPlayer.getDuration(), videoPlayer.getDuration());
+
+		ImGui::InputText("output MP4", &renderOutputPath);
+		ImGui::Checkbox("Use external Vision server", &useExternalVisionServer);
+		if (useExternalVisionServer) {
+			ImGui::InputText("Vision model ID", &visionModel);
+			ImGui::InputText("Vision server URL", &visionServerUrl);
+		} else {
+			ImGui::InputText("Vision model GGUF", &visionModelPath);
+			if (ImGui::Button("Browse local Vision model GGUF...")) {
+				chooseVisionModel();
+			}
+			ImGui::InputText("Vision mmproj GGUF", &visionMmprojPath);
+			if (ImGui::Button("Browse Vision mmproj GGUF...")) {
+				chooseVisionMmproj();
+			}
+			ImGui::TextUnformatted("The Vision workflow starts local llama.cpp on CUDA when rendering.");
+		}
+		if (ImGui::Button("Render deterministic MP4")) {
+			startRender(false);
+		}
+		ImGui::SameLine();
+		if (ImGui::Button(useExternalVisionServer
+			? "Render Vision-ranked MP4"
+			: "Render Vision-ranked MP4 (local CUDA)")) {
+			startRender(true);
+		}
+	}
+	if (renderRunning) {
+		ImGui::TextUnformatted("Render running; the UI remains responsive.");
+	}
+	ImGui::TextWrapped("%s", renderStatus.c_str());
+}
+
 void ofApp::drawClipControls() {
 	bool changed = false;
 	ImGui::TextUnformatted("Montage options");
+	changed |= ImGui::InputText("montage prompt", &montageOptions.prompt);
 	float transitionSeconds = static_cast<float>(montageOptions.transitionSeconds);
 	float handleSeconds = static_cast<float>(montageOptions.handleSeconds);
 	float beatBpm = static_cast<float>(montageOptions.beatBpm);

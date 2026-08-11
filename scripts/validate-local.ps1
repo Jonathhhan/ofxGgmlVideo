@@ -78,6 +78,11 @@ Assert-FileContains (Join-Path $montageExampleRoot "src\ofApp.cpp") "overlap tra
 Assert-FileContains (Join-Path $montageExampleRoot "src\ofApp.cpp") "Montage Handoff" "montage example handoff panel"
 Assert-FileContains (Join-Path $montageExampleRoot "src\ofApp.cpp") "sample fps" "montage example frame sampling controls"
 Assert-FileContains (Join-Path $montageExampleRoot "src\ofApp.cpp") "frame references" "montage example frame references"
+Assert-FileContains (Join-Path $montageExampleRoot "src\ofApp.cpp") "ofDisableArbTex\(\)" "montage example GL_TEXTURE_2D preview allocation"
+Assert-FileContains (Join-Path $montageExampleRoot "src\ofApp.cpp") "Browse local Vision model GGUF" "montage example local Vision model browser"
+Assert-FileContains (Join-Path $montageExampleRoot "src\ofApp.cpp") "Browse Vision mmproj GGUF" "montage example local Vision projector browser"
+Assert-FileContains (Join-Path $montageExampleRoot "src\ofApp.cpp") "Render Vision-ranked MP4 \(local CUDA\)" "montage example local CUDA render path"
+Assert-FileContains (Join-Path $scriptRoot "run-video-montage-workflow.ps1") "start-local-vision-server.ps1" "montage workflow local Vision launcher handoff"
 
 Assert-Path (Join-Path $addonRoot "tests\CMakeLists.txt") "test CMakeLists"
 Assert-Path (Join-Path $addonRoot "tests\test_main.cpp") "test source"
@@ -91,6 +96,7 @@ Assert-Path (Join-Path $scriptRoot "run-video-runtime-smoke.sh") "Video runtime 
 Assert-Path (Join-Path $scriptRoot "test-video-runtime-smoke.ps1") "Video runtime smoke contract test"
 Assert-Path (Join-Path $scriptRoot "run-model-informed-montage-smoke.ps1") "model-informed montage smoke"
 Assert-Path (Join-Path $scriptRoot "run-model-informed-montage-smoke.bat") "model-informed montage smoke Windows wrapper"
+Assert-Path (Join-Path $scriptRoot "test-video-montage-workflow.ps1") "video montage workflow test"
 
 $nestedExamples = Join-Path $addonRoot "examples"
 if (Test-Path -LiteralPath $nestedExamples -PathType Container) {
@@ -131,6 +137,9 @@ if (!$?) {
 
 Write-Step "Checking Video runtime smoke contract"
 & (Join-Path $scriptRoot "test-video-runtime-smoke.ps1")
+
+Write-Step "Checking rendered video montage workflow"
+& (Join-Path $scriptRoot "test-video-montage-workflow.ps1")
 
 Write-Step "Running headless tests"
 & (Join-Path $scriptRoot "test-addon.ps1")
