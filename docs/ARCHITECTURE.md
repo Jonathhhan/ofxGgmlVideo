@@ -1,18 +1,19 @@
 # Architecture
 
-`ofxGgmlVideo` owns video-specific montage and clip workflow code. It should
-use `ofxGgmlCore` for stable runtime primitives and keep model-family workflow
-details out of core.
+`ofxGgmlVideo` owns video-specific montage and clip workflow code. It has no
+direct ggml runtime dependency and keeps model-family workflows in their
+companion addons.
 
 ## Dependency Direction
 
 ```text
 openFrameworks app
   -> ofxGgmlVideo
-      -> ofxGgmlCore
+  -> optional vision or agent companion
 ```
 
-No dependency should point from `ofxGgmlCore` back to `ofxGgmlVideo`.
+Cross-addon model decisions are app-level handoffs; Video does not link model
+companions transitively.
 
 ## Owned Here
 

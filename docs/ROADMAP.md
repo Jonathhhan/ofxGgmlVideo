@@ -5,7 +5,7 @@
 - Seed the companion addon skeleton.
 - Keep `ofxGgmlVideoMontageExample` as the single canonical root-level example,
   including clip-window frame sampling and montage handoff inspection.
-- Keep `ofxGgmlCore` as the only required library dependency; examples may depend on `ofxImGui`.
+- Keep montage planning independent of a concrete ggml runtime; examples may depend on `ofxImGui` and invoke model companions explicitly.
 - Add deterministic clip-window frame sampling helpers.
 - Add deterministic montage segment and timeline plan helpers.
 - Add transition, handle, and overlapping timeline metadata for montage plans.

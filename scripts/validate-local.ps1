@@ -35,12 +35,25 @@ function Assert-FileContains {
 		throw "$Label did not contain expected pattern: $Pattern"
 	}
 }
+function Assert-FileNotContains {
+	param(
+		[string]$Path,
+		[string]$Pattern,
+		[string]$Label
+	)
+
+	$content = Get-Content -LiteralPath $Path -Raw
+	if ($content -match $Pattern) {
+		throw "$Label contained forbidden pattern: $Pattern"
+	}
+}
 $scriptRoot = Split-Path -Parent $MyInvocation.MyCommand.Path
 $addonRoot = Split-Path -Parent $scriptRoot
 $addonsRoot = Split-Path -Parent $addonRoot
 
 Write-Step "Checking addon skeleton"
 Assert-Path (Join-Path $addonRoot "addon_config.mk") "addon config"
+Assert-FileNotContains (Join-Path $addonRoot "addon_config.mk") "ADDON_DEPENDENCIES.*ofxGgmlCore" "addon config"
 Assert-Path (Join-Path $addonRoot "README.md") "README"
 Assert-Path (Join-Path $addonRoot "LICENSE") "license"
 Assert-Path (Join-Path $addonRoot "docs\VIDEO_WORKFLOWS.md") "video workflow docs"
@@ -62,13 +75,13 @@ Assert-FileContains (Join-Path $addonRoot "src\ofxGgmlVideo\ofxGgmlVideoUtils.h"
 Assert-FileContains (Join-Path $addonRoot "docs\VIDEO_WORKFLOWS.md") "montage-handoff-v1" "montage handoff docs"
 
 Write-Step "Checking dependency layout"
-Assert-Path (Join-Path $addonsRoot "ofxGgmlCore") "sibling ofxGgmlCore addon" -Directory
 Assert-Path (Join-Path $addonsRoot "ofxImGui") "sibling ofxImGui addon for examples" -Directory
 
 Write-Step "Checking example layout"
 $montageExampleRoot = Join-Path $addonRoot "ofxGgmlVideoMontageExample"
 Assert-Path $montageExampleRoot "root-level montage example" -Directory
 Assert-Path (Join-Path $montageExampleRoot "addons.make") "montage example addons.make"
+Assert-FileNotContains (Join-Path $montageExampleRoot "addons.make") "(?m)^ofxGgmlCore\s*$" "montage example addons.make"
 Assert-FileContains (Join-Path $montageExampleRoot "addons.make") "(?m)^ofxImGui\s*$" "montage example addons.make"
 Assert-Path (Join-Path $montageExampleRoot "src\main.cpp") "montage example main.cpp"
 Assert-Path (Join-Path $montageExampleRoot "src\ofApp.h") "montage example ofApp.h"

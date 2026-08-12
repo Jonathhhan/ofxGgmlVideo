@@ -11,7 +11,6 @@ if (!$?) {
 $text = $output -join "`n"
 foreach ($expected in @(
 	"ofxGgmlVideo doctor",
-	"ofxGgmlCore sibling",
 	"montage example",
 	"video request types",
 	"video input",

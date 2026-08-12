@@ -9,7 +9,6 @@ $ErrorActionPreference = "Stop"
 
 $scriptRoot = Split-Path -Parent $MyInvocation.MyCommand.Path
 $addonRoot = Resolve-Path (Join-Path $scriptRoot "..")
-$addonsRoot = Split-Path -Parent $addonRoot
 $script:Warnings = 0
 
 function New-Check {
@@ -88,13 +87,7 @@ foreach ($tool in @("git", "cmake")) {
 }
 
 $checks += Test-PathCheck `
-	-Path (Join-Path $addonsRoot "ofxGgmlCore") `
-	-Name "ofxGgmlCore sibling" `
-	-MissingDetail "clone beside ofxGgmlVideo" `
-	-Directory
-
-$checks += Test-PathCheck `
-	-Path (Join-Path $addonsRoot "ofxImGui") `
+	-Path (Join-Path (Split-Path -Parent $addonRoot) "ofxImGui") `
 	-Name "ofxImGui" `
 	-MissingDetail "install beside ofxGgmlVideo before building the examples" `
 	-Directory

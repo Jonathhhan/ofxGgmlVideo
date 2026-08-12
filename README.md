@@ -1,10 +1,12 @@
 # ofxGgmlVideo
 
-`ofxGgmlVideo` is the companion addon for video montage workflows, clip
+`ofxGgmlVideo` is the standalone companion addon for video montage workflows, clip
 timelines, frame pipelines, temporal sampling, and video-to-agent handoff
-planning on top of `ofxGgmlCore`.
+planning.
 
-`ofxGgmlCore` stays the dependency. This addon owns video-specific workflow code so core can stay small and boring.
+It has no direct Core or ggml link dependency. Apps explicitly combine it with
+`ofxGgmlVision`, `ofxGgmlAgents`, or another local model companion when a
+montage needs model-backed decisions.
 
 Family map: https://jonathhhan.github.io/ofxGgmlCore/
 
@@ -32,7 +34,7 @@ Current addon API version: `1.0.1`.
 
 `ofxGgmlVideoMontageExample` is the canonical root-level video request and
 MontageAutomat substrate example. Generate it with the openFrameworks
-projectGenerator using addons `ofxGgmlVideo`, `ofxGgmlCore`, and `ofxImGui`.
+projectGenerator using addons `ofxGgmlVideo` and `ofxImGui`.
 It shows clip-window controls, deterministic frame references, ordered montage
 segments, transition and handle controls, beat-marker controls, a simple
 timeline preview, and an edit-decision-list plus machine-readable manifest
@@ -56,7 +58,6 @@ For video-lane planning, temporal boundaries, and generated media rules, see
 ## Dependencies
 
 - openFrameworks
-- `ofxGgmlCore`
 - `ofxImGui` for examples
 
 ## Validate

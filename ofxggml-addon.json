@@ -2,9 +2,7 @@
   "name": "ofxGgmlVideo",
   "lane": "video",
   "coreBaseline": "v1.0.1",
-  "requires": [
-    "ofxGgmlCore"
-  ],
+  "requires": [],
   "owns": [
     "video montage workflows",
     "edit-decision timeline planning",
