@@ -69,6 +69,19 @@ Runtime changes should name whether the path changes decoding, montage
 planning, clip planning, frame sampling, temporal analysis, agent handoff,
 vision/CLIP handoff, frame export, or example UI.
 
+### Rendering an existing montage manifest
+
+`scripts/run-video-montage-workflow.ps1 -MontageManifestPath <path>` consumes
+the existing `ofxGgmlVideoMontageManifest` version 1 contract. Its segment
+source starts and durations become the actual FFmpeg render windows instead of
+being replaced by evenly spaced samples. The current renderer accepts one
+input video per invocation and renders hard cuts; transition metadata remains
+available in the manifest for a later transition-capable render pass.
+
+Without `-MontageManifestPath`, the workflow preserves its original evenly
+spaced sampling behavior. Model-backed mode ranks the representative frame
+from each supplied segment while retaining that segment's source window.
+
 ## Validation ladder
 
 Use the smallest command that proves the changed layer:

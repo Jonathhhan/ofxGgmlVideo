@@ -38,6 +38,7 @@ private:
 	std::string videoPath;
 	std::string renderOutputPath;
 	std::string activeRenderOutputPath;
+	std::string activeManifestPath;
 	std::string workflowScript;
 	std::string visionModel;
 	std::string visionModelPath;

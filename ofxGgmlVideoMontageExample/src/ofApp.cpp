@@ -95,11 +95,20 @@ void ofApp::update() {
 		const int exitCode = renderFuture.get();
 		renderRunning = false;
 		if (exitCode == 0 && ofFile::doesFileExist(activeRenderOutputPath)) {
-			renderStatus = "Rendered MP4: " + activeRenderOutputPath;
+			renderStatus = "Rendered planned clip windows as MP4 (hard cuts): " + activeRenderOutputPath;
 			ofLogNotice("ofxGgmlVideoMontageExample") << renderStatus;
 		} else {
 			renderStatus = "Render failed with exit code " + ofToString(exitCode) + ". See the console for the first FFmpeg or Vision error.";
 			ofLogError("ofxGgmlVideoMontageExample") << renderStatus;
+		}
+		if (!activeManifestPath.empty()) {
+			std::error_code removeError;
+			std::filesystem::remove(activeManifestPath, removeError);
+			if (removeError) {
+				ofLogWarning("ofxGgmlVideoMontageExample")
+					<< "Could not remove temporary montage manifest: " << removeError.message();
+			}
+			activeManifestPath.clear();
 		}
 		activeRenderOutputPath.clear();
 	}
@@ -180,6 +189,11 @@ void ofApp::startRender(const bool modelBacked) {
 		ofLogError("ofxGgmlVideoMontageExample") << renderStatus;
 		return;
 	}
+	if (!montagePlan || montagePlan.segments.empty() || manifestJson.empty()) {
+		renderStatus = "Build a valid montage with at least one clip before rendering.";
+		ofLogError("ofxGgmlVideoMontageExample") << renderStatus;
+		return;
+	}
 	if (modelBacked) {
 		if (useExternalVisionServer && visionModel.empty()) {
 			renderStatus = "Enter the external Vision model ID before starting a model-ranked render.";
@@ -199,12 +213,22 @@ void ofApp::startRender(const bool modelBacked) {
 		std::replace(value.begin(), value.end(), '"', '\'');
 		return "\"" + value + "\"";
 	};
+	const auto manifestPath = std::filesystem::temp_directory_path() /
+		("ofxGgmlVideo-montage-" + ofToString(ofGetSystemTimeMillis()) + ".json");
+	ofBuffer manifestBuffer;
+	manifestBuffer.set(manifestJson.data(), manifestJson.size());
+	if (!ofBufferToFile(manifestPath.string(), manifestBuffer, false)) {
+		renderStatus = "Could not write the temporary montage manifest: " + manifestPath.string();
+		ofLogError("ofxGgmlVideoMontageExample") << renderStatus;
+		return;
+	}
 	std::ostringstream command;
 	command << "powershell.exe -NoProfile -ExecutionPolicy Bypass -File " << quote(workflowScript)
 		<< " -Video " << quote(videoPath)
 		<< " -OutputPath " << quote(renderOutputPath)
 		<< " -MontagePrompt " << quote(montageOptions.prompt)
-		<< " -SampleCount 6 -MaxOutputSegments 4 -SegmentDurationSeconds 2";
+		<< " -MontageManifestPath " << quote(manifestPath.string())
+		<< " -MaxOutputSegments " << montagePlan.segments.size();
 	if (modelBacked) {
 		if (useExternalVisionServer) {
 			command << " -VisionModel " << quote(visionModel)
@@ -221,11 +245,12 @@ void ofApp::startRender(const bool modelBacked) {
 	const std::string localBackendLabel = localVisionBackendIndex == 0 ? "CUDA" : "CPU";
 	renderStatus = modelBacked
 		? (useExternalVisionServer
-			? "External Vision ranking and MP4 render running..."
-			: "Local " + localBackendLabel + " Vision ranking and MP4 render running...")
-		: "Deterministic MP4 render running...";
+			? "External Vision ranking of the planned clip windows and MP4 render running..."
+			: "Local " + localBackendLabel + " Vision ranking of the planned clip windows and MP4 render running...")
+		: "Rendering the planned clip windows as a deterministic MP4...";
 	renderRunning = true;
 	activeRenderOutputPath = renderOutputPath;
+	activeManifestPath = manifestPath.string();
 	const std::string commandText = command.str();
 	renderFuture = std::async(std::launch::async, [commandText]() {
 		return std::system(commandText.c_str());
@@ -337,6 +362,7 @@ void ofApp::drawVideoInput() {
 				: "Render Vision-ranked MP4 (local CPU)"))) {
 			startRender(true);
 		}
+		ImGui::TextUnformatted("Source windows come from the visible montage; transition metadata currently renders as hard cuts.");
 	}
 	if (renderRunning) {
 		ImGui::TextUnformatted("Render running; the UI remains responsive.");

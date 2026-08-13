@@ -3,6 +3,7 @@ param(
 	[string]$Video,
 	[string]$OutputPath = "",
 	[string]$MontagePrompt = "strong visual montage",
+	[string]$MontageManifestPath = "",
 	[string]$VisionModel = $(if ($env:OFXGGML_VISION_SERVER_MODEL) { $env:OFXGGML_VISION_SERVER_MODEL } else { "" }),
 	[string]$VisionServerUrl = $(if ($env:OFXGGML_VISION_SERVER_URL) { $env:OFXGGML_VISION_SERVER_URL } else { "http://127.0.0.1:8080" }),
 	[string]$VisionModelPath = $(if ($env:OFXGGML_VISION_MODEL) { $env:OFXGGML_VISION_MODEL } else { "" }),
@@ -117,10 +118,10 @@ if (!(Test-Path -LiteralPath $expandedVideo -PathType Leaf)) {
 }
 $resolvedVideo = (Resolve-Path -LiteralPath $expandedVideo).Path
 
-if ($SampleCount -lt 2) {
+if ([string]::IsNullOrWhiteSpace($MontageManifestPath) -and $SampleCount -lt 2) {
 	throw "SampleCount must be at least 2."
 }
-if ($MaxOutputSegments -lt 1 -or $MaxOutputSegments -gt $SampleCount) {
+if ($MaxOutputSegments -lt 1 -or ([string]::IsNullOrWhiteSpace($MontageManifestPath) -and $MaxOutputSegments -gt $SampleCount)) {
 	throw "MaxOutputSegments must be between 1 and SampleCount."
 }
 if ($SegmentDurationSeconds -le 0) {
@@ -153,6 +154,73 @@ if ($localVision) {
 $ffmpeg = Resolve-Executable -ExplicitPath $FfmpegExecutable -CommandName "ffmpeg"
 $ffprobe = Resolve-Executable -ExplicitPath $FfprobeExecutable -CommandName "ffprobe"
 $durationSeconds = Get-VideoDuration -Ffprobe $ffprobe -Path $resolvedVideo
+$manifestDriven = ![string]::IsNullOrWhiteSpace($MontageManifestPath)
+$resolvedManifestPath = ""
+$manifestSegments = @()
+if ($manifestDriven) {
+	$expandedManifestPath = [Environment]::ExpandEnvironmentVariables($MontageManifestPath)
+	if (![System.IO.Path]::IsPathRooted($expandedManifestPath)) {
+		$expandedManifestPath = Join-Path (Get-Location).Path $expandedManifestPath
+	}
+	if (!(Test-Path -LiteralPath $expandedManifestPath -PathType Leaf)) {
+		throw "Montage manifest was not found: $expandedManifestPath"
+	}
+	$resolvedManifestPath = (Resolve-Path -LiteralPath $expandedManifestPath).Path
+	try {
+		$manifest = Get-Content -LiteralPath $resolvedManifestPath -Raw | ConvertFrom-Json
+	} catch {
+		throw "Montage manifest is not valid JSON: $($_.Exception.Message)"
+	}
+	if ([string]$manifest.kind -ne "ofxGgmlVideoMontageManifest" -or [int]$manifest.version -ne 1) {
+		throw "Montage manifest must use kind 'ofxGgmlVideoMontageManifest' and version 1."
+	}
+	$rawSegments = @($manifest.segments)
+	if ($rawSegments.Count -lt 1) {
+		throw "Montage manifest must contain at least one segment."
+	}
+	$manifestDirectory = Split-Path -Parent $resolvedManifestPath
+	foreach ($segment in $rawSegments) {
+		$segmentSource = [Environment]::ExpandEnvironmentVariables([string]$segment.sourcePath)
+		if (![System.IO.Path]::IsPathRooted($segmentSource)) {
+			$segmentSource = Join-Path $manifestDirectory $segmentSource
+		}
+		if (!(Test-Path -LiteralPath $segmentSource -PathType Leaf)) {
+			throw "Montage manifest segment source was not found: $segmentSource"
+		}
+		$resolvedSegmentSource = (Resolve-Path -LiteralPath $segmentSource).Path
+		if (![string]::Equals($resolvedSegmentSource, $resolvedVideo, [StringComparison]::OrdinalIgnoreCase)) {
+			throw "This single-input renderer only accepts manifest segments from the selected input video: $resolvedSegmentSource"
+		}
+		$sourceStart = [double]$segment.sourceStartSeconds
+		$clipDuration = [double]$segment.durationSeconds
+		if ($sourceStart -lt 0 -or $clipDuration -le 0) {
+			throw "Montage manifest segment $($segment.index) must have a non-negative source start and positive duration."
+		}
+		if (($sourceStart + $clipDuration) -gt ($durationSeconds + 0.02)) {
+			throw "Montage manifest segment $($segment.index) exceeds the $([Math]::Round($durationSeconds, 3)) second input video."
+		}
+		$manifestSegments += [pscustomobject]@{
+			OriginalIndex = [int]$segment.index
+			SourceStartSeconds = $sourceStart
+			DurationSeconds = $clipDuration
+			SourceTimeSeconds = $sourceStart + ($clipDuration / 2.0)
+			Label = [string]$segment.label
+			TransitionInKind = [string]$segment.transitionIn.kind
+			TransitionInSeconds = [double]$segment.transitionIn.durationSeconds
+			TransitionOutKind = [string]$segment.transitionOut.kind
+			TransitionOutSeconds = [double]$segment.transitionOut.durationSeconds
+		}
+	}
+	if (!$PSBoundParameters.ContainsKey("MontagePrompt") -and ![string]::IsNullOrWhiteSpace([string]$manifest.prompt)) {
+		$MontagePrompt = [string]$manifest.prompt
+	}
+	$SampleCount = $manifestSegments.Count
+	if (!$PSBoundParameters.ContainsKey("MaxOutputSegments")) {
+		$MaxOutputSegments = $manifestSegments.Count
+	} else {
+		$MaxOutputSegments = [Math]::Min($MaxOutputSegments, $manifestSegments.Count)
+	}
+}
 
 if ([string]::IsNullOrWhiteSpace($OutputPath)) {
 	$outputDirectory = Split-Path -Parent $resolvedVideo
@@ -170,8 +238,12 @@ if ([string]::Equals($resolvedVideo, $resolvedOutput, [StringComparison]::Ordina
 }
 
 $sampleTimes = @()
-for ($index = 0; $index -lt $SampleCount; $index++) {
-	$sampleTimes += (($index + 0.5) * $durationSeconds / $SampleCount)
+if ($manifestDriven) {
+	$sampleTimes = @($manifestSegments | ForEach-Object { [double]$_.SourceTimeSeconds })
+} else {
+	for ($index = 0; $index -lt $SampleCount; $index++) {
+		$sampleTimes += (($index + 0.5) * $durationSeconds / $SampleCount)
+	}
 }
 
 $plan = [ordered]@{
@@ -180,6 +252,9 @@ $plan = [ordered]@{
 	InputVideo = $resolvedVideo
 	OutputVideo = $resolvedOutput
 	DurationSeconds = [Math]::Round($durationSeconds, 6)
+	ManifestDriven = $manifestDriven
+	MontageManifestPath = $resolvedManifestPath
+	TransitionRendering = "hard-cut"
 	SampleCount = $SampleCount
 	MaxOutputSegments = $MaxOutputSegments
 	SegmentDurationSeconds = $SegmentDurationSeconds
@@ -232,6 +307,7 @@ try {
 	$frameRecords = @()
 	for ($index = 0; $index -lt $sampleTimes.Count; $index++) {
 		$time = [double]$sampleTimes[$index]
+		$plannedSegment = if ($manifestDriven) { $manifestSegments[$index] } else { $null }
 		$framePath = Join-Path $framesRoot ("frame-{0:D3}-{1}.png" -f $index, ([Math]::Round($time * 1000.0)))
 		[void](Invoke-NativeCapture -Executable $ffmpeg -Label "FFmpeg frame extraction" -Arguments @(
 			"-hide_banner", "-loglevel", "error",
@@ -245,8 +321,15 @@ try {
 			throw "FFmpeg did not create sampled frame: $framePath"
 		}
 		$frameRecords += [pscustomobject]@{
-			OriginalIndex = $index
+			OriginalIndex = $(if ($manifestDriven) { $plannedSegment.OriginalIndex } else { $index })
 			SourceTimeSeconds = $time
+			SourceStartSeconds = $(if ($manifestDriven) { $plannedSegment.SourceStartSeconds } else { 0.0 })
+			DurationSeconds = $(if ($manifestDriven) { $plannedSegment.DurationSeconds } else { 0.0 })
+			Label = $(if ($manifestDriven) { $plannedSegment.Label } else { "sample $($index + 1)" })
+			TransitionInKind = $(if ($manifestDriven) { $plannedSegment.TransitionInKind } else { "cut" })
+			TransitionInSeconds = $(if ($manifestDriven) { $plannedSegment.TransitionInSeconds } else { 0.0 })
+			TransitionOutKind = $(if ($manifestDriven) { $plannedSegment.TransitionOutKind } else { "cut" })
+			TransitionOutSeconds = $(if ($manifestDriven) { $plannedSegment.TransitionOutSeconds } else { 0.0 })
 			FramePath = $framePath
 			Caption = ""
 			RelevanceScore = 0.0
@@ -279,6 +362,13 @@ try {
 			[pscustomobject]@{
 				OriginalIndex = $record.OriginalIndex
 				SourceTimeSeconds = $record.SourceTimeSeconds
+				SourceStartSeconds = $record.SourceStartSeconds
+				DurationSeconds = $record.DurationSeconds
+				Label = $record.Label
+				TransitionInKind = $record.TransitionInKind
+				TransitionInSeconds = $record.TransitionInSeconds
+				TransitionOutKind = $record.TransitionOutKind
+				TransitionOutSeconds = $record.TransitionOutSeconds
 				FramePath = $record.FramePath
 				Caption = [string]$_.VisionCaption
 				RelevanceScore = [double]$_.RelevanceScore
@@ -298,18 +388,28 @@ try {
 	$segments = @()
 	for ($index = 0; $index -lt $selectedFrames.Count; $index++) {
 		$frame = $selectedFrames[$index]
-		$clipDuration = [Math]::Min($SegmentDurationSeconds, $durationSeconds)
-		$maxStart = [Math]::Max(0.0, $durationSeconds - $clipDuration)
-		$sourceStart = [Math]::Max(0.0, [Math]::Min($maxStart, [double]$frame.SourceTimeSeconds - ($clipDuration / 2.0)))
+		if ($manifestDriven) {
+			$clipDuration = [double]$frame.DurationSeconds
+			$sourceStart = [double]$frame.SourceStartSeconds
+		} else {
+			$clipDuration = [Math]::Min($SegmentDurationSeconds, $durationSeconds)
+			$maxStart = [Math]::Max(0.0, $durationSeconds - $clipDuration)
+			$sourceStart = [Math]::Max(0.0, [Math]::Min($maxStart, [double]$frame.SourceTimeSeconds - ($clipDuration / 2.0)))
+		}
 		$segments += [pscustomobject]@{
 			Index = $index
 			OriginalSampleIndex = $frame.OriginalIndex
+			Label = [string]$frame.Label
 			SourceTimeSeconds = [Math]::Round([double]$frame.SourceTimeSeconds, 6)
 			SourceStartSeconds = [Math]::Round($sourceStart, 6)
 			DurationSeconds = [Math]::Round($clipDuration, 6)
 			FramePath = [string]$frame.FramePath
 			Caption = [string]$frame.Caption
 			RelevanceScore = [double]$frame.RelevanceScore
+			TransitionInKind = [string]$frame.TransitionInKind
+			TransitionInSeconds = [double]$frame.TransitionInSeconds
+			TransitionOutKind = [string]$frame.TransitionOutKind
+			TransitionOutSeconds = [double]$frame.TransitionOutSeconds
 		}
 	}
 
@@ -386,6 +486,9 @@ try {
 		OutputVideoCodec = $videoCodec
 		OutputAudioCodec = $outputAudioCodec.Trim()
 		AudioPreserved = $hasSourceAudio
+		ManifestDriven = $manifestDriven
+		MontageManifestPath = $resolvedManifestPath
+		TransitionRendering = "hard-cut"
 		ModelBacked = $modelBacked
 		InferenceChecked = $modelBacked
 		ScoringOwner = $scoringOwner
