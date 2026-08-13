@@ -10,9 +10,17 @@ param(
 	[string]$VisionMmprojPath = $(if ($env:OFXGGML_VISION_MMPROJ) { $env:OFXGGML_VISION_MMPROJ } else { "" }),
 	[ValidateSet("cuda", "cpu")]
 	[string]$VisionBackend = "cuda",
+	[ValidateRange(1, 3600)]
+	[int]$VisionStartupTimeoutSeconds = 120,
+	[ValidateSet("uniform", "scene")]
+	[string]$SamplingMode = "uniform",
 	[int]$SampleCount = 6,
 	[int]$MaxOutputSegments = 4,
 	[double]$SegmentDurationSeconds = 2.0,
+	[ValidateRange(0.01, 1.0)]
+	[double]$SceneThreshold = 0.3,
+	[ValidateRange(0.0, 3600.0)]
+	[double]$SceneMinGapSeconds = 1.0,
 	[string]$FfmpegExecutable = "",
 	[string]$FfprobeExecutable = "",
 	[switch]$SkipVision,
@@ -42,9 +50,16 @@ function Resolve-Executable {
 
 function Invoke-NativeCapture {
 	param([string]$Executable, [string[]]$Arguments, [string]$Label)
-	$output = @(& $Executable @Arguments 2>&1 | ForEach-Object { [string]$_ })
-	if ($LASTEXITCODE -ne 0) {
-		throw "$Label failed with exit code $LASTEXITCODE`n$($output -join [Environment]::NewLine)"
+	$previousErrorAction = $ErrorActionPreference
+	try {
+		$ErrorActionPreference = "Continue"
+		$output = @(& $Executable @Arguments 2>&1 | ForEach-Object { [string]$_ })
+		$exitCode = $LASTEXITCODE
+	} finally {
+		$ErrorActionPreference = $previousErrorAction
+	}
+	if ($exitCode -ne 0) {
+		throw "$Label failed with exit code $exitCode`n$($output -join [Environment]::NewLine)"
 	}
 	return @($output)
 }
@@ -78,6 +93,62 @@ function Get-VideoDuration {
 		throw "Could not determine a positive video duration from ffprobe output: $value"
 	}
 	return $duration
+}
+
+function Select-EvenlySpacedValues {
+	param([double[]]$Values, [int]$Count)
+	if ($Values.Count -le $Count) {
+		return @($Values)
+	}
+	if ($Count -eq 1) {
+		return @($Values[[Math]::Floor(($Values.Count - 1) / 2.0)])
+	}
+	$selected = @()
+	for ($index = 0; $index -lt $Count; $index++) {
+		$valueIndex = [int][Math]::Round($index * ($Values.Count - 1) / ($Count - 1.0))
+		$selected += [double]$Values[$valueIndex]
+	}
+	return @($selected)
+}
+
+function Get-SceneSamplePlan {
+	param(
+		[string]$Ffmpeg,
+		[string]$Path,
+		[double]$DurationSeconds,
+		[double]$Threshold,
+		[double]$MinGapSeconds,
+		[int]$MaxSamples
+	)
+	$filter = "scale=320:-2,select='gt(scene,$(Format-Seconds $Threshold))',showinfo"
+	$output = Invoke-NativeCapture -Executable $Ffmpeg -Label "FFmpeg scene detection" -Arguments @(
+		"-hide_banner", "-loglevel", "info", "-i", $Path,
+		"-an", "-vf", $filter, "-f", "null", "-"
+	)
+	$cuts = @()
+	foreach ($line in $output) {
+		if ($line -notmatch 'pts_time:(?<time>[0-9eE+.-]+)') { continue }
+		$time = 0.0
+		if (![double]::TryParse($Matches.time, [Globalization.NumberStyles]::Float,
+			[Globalization.CultureInfo]::InvariantCulture, [ref]$time)) { continue }
+		if ($time -le 0.0 -or $time -ge $DurationSeconds) { continue }
+		if ($cuts.Count -eq 0 -or ($time - [double]$cuts[-1]) -ge $MinGapSeconds) {
+			$cuts += $time
+		}
+	}
+	if ($cuts.Count -eq 0) {
+		return [pscustomobject]@{ Cuts = @(); Times = @() }
+	}
+	$boundaries = @(0.0) + @($cuts) + @($DurationSeconds)
+	$centers = @()
+	for ($index = 0; $index -lt $boundaries.Count - 1; $index++) {
+		$centers += ([double]$boundaries[$index] +
+			(([double]$boundaries[$index + 1] - [double]$boundaries[$index]) / 2.0))
+	}
+	return [pscustomobject]@{
+		Cuts = @($cuts)
+		Times = @(Select-EvenlySpacedValues -Values $centers -Count $MaxSamples)
+	}
 }
 
 function Get-LocalVisionServerAlias {
@@ -147,6 +218,7 @@ if ($localVision) {
 $ffmpeg = Resolve-Executable -ExplicitPath $FfmpegExecutable -CommandName "ffmpeg"
 $ffprobe = Resolve-Executable -ExplicitPath $FfprobeExecutable -CommandName "ffprobe"
 $durationSeconds = Get-VideoDuration -Ffprobe $ffprobe -Path $resolvedVideo
+$SamplingMode = $SamplingMode.ToLowerInvariant()
 $manifestDriven = ![string]::IsNullOrWhiteSpace($MontageManifestPath)
 $resolvedManifestPath = ""
 $manifestSegments = @()
@@ -251,12 +323,34 @@ if ([string]::Equals($resolvedVideo, $resolvedOutput, [StringComparison]::Ordina
 	throw "OutputPath must not overwrite the input video."
 }
 
+$samplingModeUsed = if ($manifestDriven) { "manifest" } else { $SamplingMode }
+$samplingFallbackReason = ""
+$sceneCuts = @()
+$sceneDetectionExercised = $false
 $sampleTimes = @()
 if ($manifestDriven) {
 	$sampleTimes = @($manifestSegments | ForEach-Object { [double]$_.SourceTimeSeconds })
+	if ($SamplingMode -eq "scene" -and $PSBoundParameters.ContainsKey("SamplingMode")) {
+		throw "SamplingMode scene cannot be combined with MontageManifestPath because the manifest already owns the source windows."
+	}
+	$samplingModeUsed = "manifest"
 } else {
-	for ($index = 0; $index -lt $SampleCount; $index++) {
-		$sampleTimes += (($index + 0.5) * $durationSeconds / $SampleCount)
+	if ($SamplingMode -eq "scene") {
+		$sceneDetectionExercised = $true
+		$scenePlan = Get-SceneSamplePlan -Ffmpeg $ffmpeg -Path $resolvedVideo `
+			-DurationSeconds $durationSeconds -Threshold $SceneThreshold `
+			-MinGapSeconds $SceneMinGapSeconds -MaxSamples $SampleCount
+		$sceneCuts = @($scenePlan.Cuts)
+		$sampleTimes = @($scenePlan.Times)
+		if ($sampleTimes.Count -eq 0) {
+			$samplingModeUsed = "uniform"
+			$samplingFallbackReason = "No scene change met the selected threshold; using uniform samples."
+		}
+	}
+	if ($sampleTimes.Count -eq 0) {
+		for ($index = 0; $index -lt $SampleCount; $index++) {
+			$sampleTimes += (($index + 0.5) * $durationSeconds / $SampleCount)
+		}
 	}
 }
 
@@ -270,7 +364,14 @@ $plan = [ordered]@{
 	MontageManifestPath = $resolvedManifestPath
 	TransitionRendering = $plannedTransitionRendering
 	TransitionCount = $plannedTransitionCount
-	SampleCount = $SampleCount
+	SamplingModeRequested = $(if ($manifestDriven) { "manifest" } else { $SamplingMode })
+	SamplingModeUsed = $samplingModeUsed
+	SamplingFallbackReason = $samplingFallbackReason
+	SceneDetectionExercised = $sceneDetectionExercised
+	SceneThreshold = $SceneThreshold
+	SceneMinGapSeconds = $SceneMinGapSeconds
+	SceneCutsSeconds = @($sceneCuts | ForEach-Object { [Math]::Round($_, 6) })
+	SampleCount = $sampleTimes.Count
 	MaxOutputSegments = $MaxOutputSegments
 	SegmentDurationSeconds = $SegmentDurationSeconds
 	MontagePrompt = $MontagePrompt
@@ -300,7 +401,8 @@ if ($localVision) {
 		-ModelPath $VisionModelPath `
 		-MmprojPath $VisionMmprojPath `
 		-Alias $localVisionServerAlias `
-		-GpuLayers $visionGpuLayers
+		-GpuLayers $visionGpuLayers `
+		-StartupTimeoutSeconds $VisionStartupTimeoutSeconds
 	if (!$?) {
 		throw "The local llama.cpp Vision model did not start."
 	}
@@ -337,7 +439,7 @@ try {
 			SourceTimeSeconds = $time
 			SourceStartSeconds = $(if ($manifestDriven) { $plannedSegment.SourceStartSeconds } else { 0.0 })
 			DurationSeconds = $(if ($manifestDriven) { $plannedSegment.DurationSeconds } else { 0.0 })
-			Label = $(if ($manifestDriven) { $plannedSegment.Label } else { "sample $($index + 1)" })
+			Label = $(if ($manifestDriven) { $plannedSegment.Label } elseif ($samplingModeUsed -eq "scene") { "scene $($index + 1)" } else { "sample $($index + 1)" })
 			TransitionInKind = $(if ($manifestDriven) { $plannedSegment.TransitionInKind } else { "cut" })
 			TransitionInSeconds = $(if ($manifestDriven) { $plannedSegment.TransitionInSeconds } else { 0.0 })
 			TransitionOutKind = $(if ($manifestDriven) { $plannedSegment.TransitionOutKind } else { "cut" })
@@ -349,7 +451,7 @@ try {
 	}
 
 	$modelBacked = !$SkipVision
-	$scoringOwner = "ofxGgmlVideo chronological sampling"
+	$scoringOwner = "ofxGgmlVideo $samplingModeUsed sampling"
 	$orderedFrames = @($frameRecords)
 	if ($modelBacked) {
 		$rankingOutput = @(& $rankingScript `
@@ -553,6 +655,14 @@ try {
 		AudioPreserved = $hasSourceAudio
 		ManifestDriven = $manifestDriven
 		MontageManifestPath = $resolvedManifestPath
+		SamplingModeRequested = $(if ($manifestDriven) { "manifest" } else { $SamplingMode })
+		SamplingModeUsed = $samplingModeUsed
+		SamplingFallbackReason = $samplingFallbackReason
+		SceneDetectionExercised = $sceneDetectionExercised
+		SceneThreshold = $SceneThreshold
+		SceneMinGapSeconds = $SceneMinGapSeconds
+		SceneCutsSeconds = @($sceneCuts | ForEach-Object { [Math]::Round($_, 6) })
+		SampleTimesSeconds = @($sampleTimes | ForEach-Object { [Math]::Round($_, 6) })
 		TransitionRendering = $transitionRendering
 		TransitionCount = $renderedTransitions.Count
 		RenderedTransitions = $renderedTransitions

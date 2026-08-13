@@ -24,7 +24,7 @@ function Get-MeaningfulTokens {
 function Get-ScoringTokens {
 	param([string] $Text)
 	$tokens = @(Get-MeaningfulTokens -Text $Text)
-	$genericVisualWords = @("frame", "frames", "image", "images", "montage", "most", "picture", "pictures", "prefer", "preferred", "visual", "visually")
+	$genericVisualWords = @("frame", "frames", "image", "images", "montage", "most", "picture", "pictures", "prefer", "preferred", "scene", "scenes", "visual", "visually")
 	$specific = @($tokens | Where-Object { $_ -notin $genericVisualWords })
 	return $(if ($specific.Count -gt 0) { $specific } else { $tokens })
 }
@@ -105,7 +105,7 @@ for ($index = 0; $index -lt $resolvedImages.Count; $index++) {
 			-ServerUrl $VisionServerUrl `
 			-Model $VisionModel `
 			-Image $image `
-			-Prompt "Describe the visible subject, predominant colors, mood, and composition. Use concrete words." `
+			-Prompt "Describe only what is visibly present. List the main subject, colors, actions, setting, and composition in concise concrete words. Do not invent absent objects, text, or mood." `
 			-MaxTokens 128 `
 			-Json `
 			-SummaryOnly 2>&1

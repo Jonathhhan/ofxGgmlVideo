@@ -16,6 +16,14 @@ the deterministic frame references produced by those settings. The same helper
 behavior is covered headlessly by the addon tests and
 `scripts/run-video-runtime-smoke.*`.
 
+The render-source selector keeps this planned timeline path and adds an
+automatic source-sampling path. `Scene-aware` sampling uses FFmpeg to detect
+hard visual changes and samples the center of each detected scene before the
+existing deterministic or Vision-ranked render. Threshold, minimum scene gap,
+candidate count, output count, and segment duration are visible controls.
+Videos without a qualifying cut use a clearly reported uniform fallback; the
+visible planned timeline remains unchanged by automatic rendering.
+
 For model-informed ordering, select a local Vision model GGUF and its matching
 mmproj GGUF, choose `CUDA` or `CPU`, and start a Vision-ranked render. CUDA
 offloads model layers to the GPU; CPU passes zero GPU layers to the same local

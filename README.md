@@ -56,6 +56,16 @@ reports the selected backend in dry-run and result metadata. The script exposes
 the same choice as `-VisionBackend cuda|cpu`. An external OpenAI-compatible
 Vision server remains available through an explicit checkbox.
 
+The renderer can use either the visible planned timeline or automatic sampling
+over the selected source video. Automatic `scene` mode runs FFmpeg scene-change
+detection, filters cuts by a minimum temporal gap, samples the centers of the
+resulting scenes, and deterministically limits the candidate count before the
+existing optional Vision ranking. If no cut reaches the selected threshold, the
+workflow reports that first-class condition and uses explicit uniform sampling;
+an FFmpeg detection failure remains an error rather than being hidden by the
+fallback. The script exposes these controls as `-SamplingMode scene|uniform`,
+`-SceneThreshold`, and `-SceneMinGapSeconds`.
+
 Local server reuse is configuration-safe: the workflow derives a stable server
 alias from the Vision GGUF, mmproj GGUF, and selected backend, then checks the
 running server's model identity. A server on the local Vision port with a

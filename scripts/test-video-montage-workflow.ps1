@@ -14,6 +14,7 @@ if (!$ffmpeg -or !$ffprobe) {
 $testRoot = Join-Path ([System.IO.Path]::GetTempPath()) ("ofxGgmlVideo-workflow-test-" + [guid]::NewGuid().ToString("N"))
 $inputVideo = Join-Path $testRoot "input.mp4"
 $outputVideo = Join-Path $testRoot "output.mp4"
+$sceneOutputVideo = Join-Path $testRoot "scene-output.mp4"
 $manifestOutputVideo = Join-Path $testRoot "manifest-output.mp4"
 $manifestPath = Join-Path $testRoot "montage-manifest.json"
 $visionModel = Join-Path $testRoot "vision-model.gguf"
@@ -23,9 +24,13 @@ $visionMmproj = Join-Path $testRoot "mmproj-vision.gguf"
 try {
 	$generateOutput = @(& $ffmpeg.Source `
 		-hide_banner -loglevel error `
-		-f lavfi -i "testsrc2=size=320x180:rate=24" `
+		-f lavfi -i "color=c=red:size=320x180:rate=24:duration=1" `
+		-f lavfi -i "color=c=blue:size=320x180:rate=24:duration=1" `
+		-f lavfi -i "color=c=green:size=320x180:rate=24:duration=1" `
+		-f lavfi -i "color=c=yellow:size=320x180:rate=24:duration=1" `
 		-f lavfi -i "sine=frequency=440:sample_rate=48000" `
-		-t 4 -c:v libx264 -pix_fmt yuv420p -c:a aac -shortest -y $inputVideo 2>&1)
+		-filter_complex "[0:v][1:v][2:v][3:v]concat=n=4:v=1:a=0[outv]" `
+		-map "[outv]" -map 4:a -t 4 -c:v libx264 -pix_fmt yuv420p -c:a aac -shortest -y $inputVideo 2>&1)
 	if ($LASTEXITCODE -ne 0 -or !(Test-Path -LiteralPath $inputVideo -PathType Leaf)) {
 		throw "Failed to generate workflow test video: $($generateOutput -join [Environment]::NewLine)"
 	}
@@ -113,6 +118,42 @@ try {
 		throw "Video montage workflow dry-run did not report the expected deterministic plan."
 	}
 
+	$sceneDryRunOutput = @(& $workflowScript `
+		-Video $inputVideo `
+		-OutputPath $sceneOutputVideo `
+		-SkipVision `
+		-SamplingMode scene `
+		-SceneThreshold 0.1 `
+		-SceneMinGapSeconds 0.5 `
+		-SampleCount 4 `
+		-MaxOutputSegments 3 `
+		-DryRun `
+		-Json)
+	$sceneDryRun = ($sceneDryRunOutput -join [Environment]::NewLine) | ConvertFrom-Json
+	if (!$sceneDryRun.Ready -or !$sceneDryRun.SceneDetectionExercised -or
+		$sceneDryRun.SamplingModeRequested -ne "scene" -or $sceneDryRun.SamplingModeUsed -ne "scene" -or
+		$sceneDryRun.SceneCutsSeconds.Count -ne 3 -or $sceneDryRun.SampleTimesSeconds.Count -ne 4 -or
+		![string]::IsNullOrWhiteSpace([string]$sceneDryRun.SamplingFallbackReason)) {
+		throw "Video montage workflow did not derive scene-centered samples from real FFmpeg cut detection."
+	}
+
+	$sceneFallbackOutput = @(& $workflowScript `
+		-Video $inputVideo `
+		-OutputPath $sceneOutputVideo `
+		-SkipVision `
+		-SamplingMode scene `
+		-SceneThreshold 1.0 `
+		-SampleCount 3 `
+		-MaxOutputSegments 2 `
+		-DryRun `
+		-Json)
+	$sceneFallback = ($sceneFallbackOutput -join [Environment]::NewLine) | ConvertFrom-Json
+	if (!$sceneFallback.SceneDetectionExercised -or $sceneFallback.SamplingModeUsed -ne "uniform" -or
+		$sceneFallback.SampleTimesSeconds.Count -ne 3 -or
+		[string]::IsNullOrWhiteSpace([string]$sceneFallback.SamplingFallbackReason)) {
+		throw "Video montage workflow did not expose its no-cut uniform fallback."
+	}
+
 	[void](New-Item -ItemType File -Path $visionModel)
 	[void](New-Item -ItemType File -Path $visionMmproj)
 	$testVisionModel = $visionModel
@@ -126,6 +167,10 @@ try {
 	$scoringTokens = @(Get-ScoringTokens -Text "Prefer the image with the most visual detail and varied structure.")
 	if (($scoringTokens -join ",") -ne "detail,varied,structure") {
 		throw "Model-informed ranking did not remove generic visual prompt words."
+	}
+	$sceneScoringTokens = @(Get-ScoringTokens -Text "Prefer the bright yellow scene.")
+	if (($sceneScoringTokens -join ",") -ne "bright,yellow") {
+		throw "Model-informed ranking treated generic scene language as visual evidence."
 	}
 	$relatedTokens = @(Get-MatchedPromptTokens `
 		-PromptTokens @("detail", "varied", "structure") `
@@ -193,6 +238,24 @@ try {
 	}
 	if (!$render.AudioPreserved -or [string]$render.OutputAudioCodec -ne "aac") {
 		throw "Video montage workflow did not preserve the source audio as AAC."
+	}
+
+	$sceneRenderOutput = @(& $workflowScript `
+		-Video $inputVideo `
+		-OutputPath $sceneOutputVideo `
+		-SkipVision `
+		-SamplingMode scene `
+		-SceneThreshold 0.1 `
+		-SceneMinGapSeconds 0.5 `
+		-SampleCount 4 `
+		-MaxOutputSegments 3 `
+		-SegmentDurationSeconds 0.5 `
+		-Json)
+	$sceneRender = ($sceneRenderOutput -join [Environment]::NewLine) | ConvertFrom-Json
+	if (!$sceneRender.Passed -or !$sceneRender.SceneDetectionExercised -or
+		$sceneRender.SamplingModeUsed -ne "scene" -or $sceneRender.SceneCutsSeconds.Count -ne 3 -or
+		$sceneRender.SegmentCount -ne 3 -or !(Test-Path -LiteralPath $sceneOutputVideo -PathType Leaf)) {
+		throw "Video montage workflow did not render a real scene-sampled MP4."
 	}
 
 	$manifestRenderOutput = @(& $workflowScript `

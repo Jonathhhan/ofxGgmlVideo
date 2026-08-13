@@ -26,6 +26,27 @@ namespace {
 #endif
 	}
 
+	std::string summarizeRenderFailure(const std::string & logText, const int exitCode) {
+		const auto lines = ofSplitString(logText, "\n", true, true);
+		const std::vector<std::string> priorities = {
+			"different model families",
+			"mismatch between text model",
+			"you may be using wrong mmproj",
+			"exited before readiness",
+			"failed to load multimodal model",
+			"error"
+		};
+		for (const auto & priority : priorities) {
+			for (const auto & rawLine : lines) {
+				const auto line = ofTrim(rawLine);
+				if (!line.empty() && ofToLower(line).find(priority) != std::string::npos) {
+					return "Render failed: " + line.substr(0, 480);
+				}
+			}
+		}
+		return "Render failed with exit code " + ofToString(exitCode) + ". See the workflow output in the console.";
+	}
+
 	ofxGgmlVideoRequest makeClip(const std::string & path,
 	                             const std::string & label,
 	                             const double startSeconds,
@@ -94,11 +115,18 @@ void ofApp::update() {
 		renderFuture.wait_for(std::chrono::milliseconds(0)) == std::future_status::ready) {
 		const int exitCode = renderFuture.get();
 		renderRunning = false;
+		std::string renderLog;
+		if (!activeRenderLogPath.empty() && ofFile::doesFileExist(activeRenderLogPath)) {
+			renderLog = ofBufferFromFile(activeRenderLogPath).getText();
+			if (!renderLog.empty()) {
+				ofLogNotice("ofxGgmlVideoMontageExample") << "Workflow output:\n" << renderLog;
+			}
+		}
 		if (exitCode == 0 && ofFile::doesFileExist(activeRenderOutputPath)) {
 			renderStatus = "Rendered the planned montage as MP4: " + activeRenderOutputPath;
 			ofLogNotice("ofxGgmlVideoMontageExample") << renderStatus;
 		} else {
-			renderStatus = "Render failed with exit code " + ofToString(exitCode) + ". See the console for the first FFmpeg or Vision error.";
+			renderStatus = summarizeRenderFailure(renderLog, exitCode);
 			ofLogError("ofxGgmlVideoMontageExample") << renderStatus;
 		}
 		if (!activeManifestPath.empty()) {
@@ -111,6 +139,11 @@ void ofApp::update() {
 			activeManifestPath.clear();
 		}
 		activeRenderOutputPath.clear();
+		if (!activeRenderLogPath.empty()) {
+			std::error_code removeError;
+			std::filesystem::remove(activeRenderLogPath, removeError);
+			activeRenderLogPath.clear();
+		}
 	}
 }
 
@@ -180,7 +213,7 @@ void ofApp::dragEvent(ofDragInfo dragInfo) {
 	}
 }
 
-void ofApp::startRender(const bool modelBacked) {
+void ofApp::startRender(const bool modelBacked, const bool automaticSampling) {
 	if (!videoLoaded || renderRunning) {
 		return;
 	}
@@ -189,7 +222,7 @@ void ofApp::startRender(const bool modelBacked) {
 		ofLogError("ofxGgmlVideoMontageExample") << renderStatus;
 		return;
 	}
-	if (!montagePlan || montagePlan.segments.empty() || manifestJson.empty()) {
+	if (!automaticSampling && (!montagePlan || montagePlan.segments.empty() || manifestJson.empty())) {
 		renderStatus = "Build a valid montage with at least one clip before rendering.";
 		ofLogError("ofxGgmlVideoMontageExample") << renderStatus;
 		return;
@@ -213,22 +246,34 @@ void ofApp::startRender(const bool modelBacked) {
 		std::replace(value.begin(), value.end(), '"', '\'');
 		return "\"" + value + "\"";
 	};
-	const auto manifestPath = std::filesystem::temp_directory_path() /
-		("ofxGgmlVideo-montage-" + ofToString(ofGetSystemTimeMillis()) + ".json");
-	ofBuffer manifestBuffer;
-	manifestBuffer.set(manifestJson.data(), manifestJson.size());
-	if (!ofBufferToFile(manifestPath.string(), manifestBuffer, false)) {
-		renderStatus = "Could not write the temporary montage manifest: " + manifestPath.string();
-		ofLogError("ofxGgmlVideoMontageExample") << renderStatus;
-		return;
+	std::filesystem::path manifestPath;
+	if (!automaticSampling) {
+		manifestPath = std::filesystem::temp_directory_path() /
+			("ofxGgmlVideo-montage-" + ofToString(ofGetSystemTimeMillis()) + ".json");
+		ofBuffer manifestBuffer;
+		manifestBuffer.set(manifestJson.data(), manifestJson.size());
+		if (!ofBufferToFile(manifestPath.string(), manifestBuffer, false)) {
+			renderStatus = "Could not write the temporary montage manifest: " + manifestPath.string();
+			ofLogError("ofxGgmlVideoMontageExample") << renderStatus;
+			return;
+		}
 	}
 	std::ostringstream command;
 	command << "powershell.exe -NoProfile -ExecutionPolicy Bypass -File " << quote(workflowScript)
 		<< " -Video " << quote(videoPath)
 		<< " -OutputPath " << quote(renderOutputPath)
-		<< " -MontagePrompt " << quote(montageOptions.prompt)
-		<< " -MontageManifestPath " << quote(manifestPath.string())
-		<< " -MaxOutputSegments " << montagePlan.segments.size();
+		<< " -MontagePrompt " << quote(montageOptions.prompt);
+	if (automaticSampling) {
+		command << " -SamplingMode " << (automaticSamplingModeIndex == 0 ? "scene" : "uniform")
+			<< " -SampleCount " << automaticSampleCount
+			<< " -MaxOutputSegments " << automaticMaxOutputSegments
+			<< " -SegmentDurationSeconds " << ofToString(automaticSegmentDurationSeconds, 3)
+			<< " -SceneThreshold " << ofToString(sceneThreshold, 3)
+			<< " -SceneMinGapSeconds " << ofToString(sceneMinGapSeconds, 3);
+	} else {
+		command << " -MontageManifestPath " << quote(manifestPath.string())
+			<< " -MaxOutputSegments " << montagePlan.segments.size();
+	}
 	if (modelBacked) {
 		if (useExternalVisionServer) {
 			command << " -VisionModel " << quote(visionModel)
@@ -241,16 +286,23 @@ void ofApp::startRender(const bool modelBacked) {
 	} else {
 		command << " -SkipVision";
 	}
+	const auto renderLogPath = std::filesystem::temp_directory_path() /
+		("ofxGgmlVideo-montage-render-" + ofToString(ofGetSystemTimeMillis()) + ".log");
+	command << " > " << quote(renderLogPath.string()) << " 2>&1";
 
 	const std::string localBackendLabel = localVisionBackendIndex == 0 ? "CUDA" : "CPU";
+	const std::string sourceLabel = automaticSampling
+		? (automaticSamplingModeIndex == 0 ? "scene-aware source sampling" : "uniform source sampling")
+		: "planned clip windows";
 	renderStatus = modelBacked
 		? (useExternalVisionServer
-			? "External Vision ranking of the planned clip windows and MP4 render running..."
-			: "Local " + localBackendLabel + " Vision ranking of the planned clip windows and MP4 render running...")
-		: "Rendering the planned clip windows and transitions as a deterministic MP4...";
+			? "External Vision ranking of " + sourceLabel + " and MP4 render running..."
+			: "Local " + localBackendLabel + " Vision ranking of " + sourceLabel + " and MP4 render running...")
+		: "Rendering " + sourceLabel + " as a deterministic MP4...";
 	renderRunning = true;
 	activeRenderOutputPath = renderOutputPath;
 	activeManifestPath = manifestPath.string();
+	activeRenderLogPath = renderLogPath.string();
 	const std::string commandText = command.str();
 	renderFuture = std::async(std::launch::async, [commandText]() {
 		return std::system(commandText.c_str());
@@ -331,6 +383,26 @@ void ofApp::drawVideoInput() {
 		ImGui::Text("%.2fs / %.2fs", videoPlayer.getPosition() * videoPlayer.getDuration(), videoPlayer.getDuration());
 
 		ImGui::InputText("output MP4", &renderOutputPath);
+		const char * renderSources[] = {"Planned timeline", "Automatic source sampling"};
+		ImGui::Combo("Render source", &renderSourceModeIndex, renderSources, 2);
+		const bool automaticSampling = renderSourceModeIndex == 1;
+		if (automaticSampling) {
+			const char * samplingModes[] = {"Scene-aware", "Uniform"};
+			ImGui::Combo("Sampling mode", &automaticSamplingModeIndex, samplingModes, 2);
+			ImGui::SliderInt("candidate frames", &automaticSampleCount, 2, 64);
+			automaticMaxOutputSegments = std::min(automaticMaxOutputSegments, automaticSampleCount);
+			ImGui::SliderInt("output segments", &automaticMaxOutputSegments, 1, automaticSampleCount);
+			ImGui::DragFloat("segment duration", &automaticSegmentDurationSeconds, 0.1f, 0.1f, 60.0f, "%.2fs");
+			if (automaticSamplingModeIndex == 0) {
+				ImGui::SliderFloat("scene threshold", &sceneThreshold, 0.01f, 1.0f, "%.2f");
+				ImGui::DragFloat("minimum scene gap", &sceneMinGapSeconds, 0.1f, 0.0f, 60.0f, "%.2fs");
+				ImGui::TextUnformatted("FFmpeg detects cuts and samples scene centers; no-cut videos report a uniform fallback.");
+			} else {
+				ImGui::TextUnformatted("Candidates are distributed evenly across the complete source video.");
+			}
+		} else {
+			ImGui::TextUnformatted("The visible clip windows, ordering, and transitions are rendered exactly from the manifest.");
+		}
 		ImGui::Checkbox("Use external Vision server", &useExternalVisionServer);
 		if (useExternalVisionServer) {
 			ImGui::InputText("Vision model ID", &visionModel);
@@ -351,18 +423,23 @@ void ofApp::drawVideoInput() {
 				? "CUDA offloads model layers to the GPU."
 				: "CPU keeps all model layers on the CPU.");
 		}
-		if (ImGui::Button("Render deterministic MP4")) {
-			startRender(false);
+		const char * deterministicLabel = automaticSampling
+			? "Render automatic deterministic MP4"
+			: "Render planned deterministic MP4";
+		if (ImGui::Button(deterministicLabel)) {
+			startRender(false, automaticSampling);
 		}
 		ImGui::SameLine();
 		if (ImGui::Button(useExternalVisionServer
-			? "Render Vision-ranked MP4"
+			? (automaticSampling ? "Render automatic Vision-ranked MP4" : "Render planned Vision-ranked MP4")
 			: (localVisionBackendIndex == 0
-				? "Render Vision-ranked MP4 (local CUDA)"
-				: "Render Vision-ranked MP4 (local CPU)"))) {
-			startRender(true);
+				? (automaticSampling ? "Automatic Vision MP4 (local CUDA)" : "Planned Vision MP4 (local CUDA)")
+				: (automaticSampling ? "Automatic Vision MP4 (local CPU)" : "Planned Vision MP4 (local CPU)")))) {
+			startRender(true, automaticSampling);
 		}
-		ImGui::TextUnformatted("Source windows and overlapping transitions come from the visible montage; non-overlapping transitions remain hard cuts.");
+		ImGui::TextUnformatted(automaticSampling
+			? "Automatic sampling creates new source windows; the visible planned timeline is left unchanged."
+			: "Source windows and overlapping transitions come from the visible montage; non-overlapping transitions remain hard cuts.");
 	}
 	if (renderRunning) {
 		ImGui::TextUnformatted("Render running; the UI remains responsive.");

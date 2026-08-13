@@ -20,7 +20,7 @@ private:
 	void chooseVideo();
 	void chooseVisionModel();
 	void chooseVisionMmproj();
-	void startRender(bool modelBacked);
+	void startRender(bool modelBacked, bool automaticSampling);
 	void drawVideoInput();
 	void rebuildMontage();
 	void drawClipControls();
@@ -39,6 +39,7 @@ private:
 	std::string renderOutputPath;
 	std::string activeRenderOutputPath;
 	std::string activeManifestPath;
+	std::string activeRenderLogPath;
 	std::string workflowScript;
 	std::string visionModel;
 	std::string visionModelPath;
@@ -51,6 +52,13 @@ private:
 	bool videoPaused = false;
 	bool useExternalVisionServer = false;
 	int localVisionBackendIndex = 0;
+	int renderSourceModeIndex = 0;
+	int automaticSamplingModeIndex = 0;
+	int automaticSampleCount = 6;
+	int automaticMaxOutputSegments = 4;
+	float automaticSegmentDurationSeconds = 2.0f;
+	float sceneThreshold = 0.3f;
+	float sceneMinGapSeconds = 1.0f;
 	std::future<int> renderFuture;
 	ofVideoPlayer videoPlayer;
 	ofxImGui::Gui gui;
