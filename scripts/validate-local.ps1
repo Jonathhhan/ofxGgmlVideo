@@ -101,7 +101,7 @@ Assert-FileContains (Join-Path $montageExampleRoot "src\ofApp.cpp") "overlapping
 Assert-FileContains (Join-Path $scriptRoot "run-video-montage-workflow.ps1") "VisionBackend" "montage workflow local backend selection"
 Assert-FileContains (Join-Path $scriptRoot "run-video-montage-workflow.ps1") "ManifestDriven" "montage workflow manifest-driven render evidence"
 Assert-FileContains (Join-Path $scriptRoot "run-video-montage-workflow.ps1") "Resolve-XfadeTransition" "montage workflow transition renderer"
-Assert-FileContains (Join-Path $scriptRoot "run-video-montage-workflow.ps1") "Assert-LocalVisionServerIdentity" "montage workflow local server identity check"
+Assert-FileNotContains (Join-Path $scriptRoot "run-video-montage-workflow.ps1") "Assert-LocalVisionServerIdentity" "montage workflow duplicate server identity check"
 Assert-FileContains (Join-Path $scriptRoot "run-video-montage-workflow.ps1") "start-local-vision-server.ps1" "montage workflow local Vision launcher handoff"
 
 Assert-Path (Join-Path $addonRoot "tests\CMakeLists.txt") "test CMakeLists"

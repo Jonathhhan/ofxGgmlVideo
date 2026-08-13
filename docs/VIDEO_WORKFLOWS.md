@@ -83,6 +83,11 @@ Without `-MontageManifestPath`, the workflow preserves its original evenly
 spaced sampling behavior. Model-backed mode ranks the representative frame
 from each supplied segment while retaining that segment's source window.
 
+Local Vision startup delegates server reuse and `/v1/models` identity checks
+through `ofxGgmlVision` to the canonical `ofxGgmlLlama` launcher. Video keeps
+its model-plus-projector-plus-backend alias, but does not duplicate llama-server
+lifecycle probing.
+
 ## Validation ladder
 
 Use the smallest command that proves the changed layer:

@@ -97,23 +97,6 @@ function Get-LocalVisionServerAlias {
 	return "ofxggml-video-$Backend-$suffix"
 }
 
-function Assert-LocalVisionServerIdentity {
-	param(
-		[string]$ServerUrl,
-		[string]$ExpectedAlias
-	)
-	try {
-		$response = Invoke-RestMethod -Uri "$($ServerUrl.TrimEnd('/'))/v1/models" -Method Get -TimeoutSec 5
-	} catch {
-		throw "Local Vision server became reachable but its model identity could not be read: $($_.Exception.Message)"
-	}
-	$modelIds = @($response.data | ForEach-Object { [string]$_.id })
-	if ($modelIds -notcontains $ExpectedAlias) {
-		$actual = if ($modelIds.Count -gt 0) { $modelIds -join ", " } else { "<none>" }
-		throw "Local Vision port is occupied by a different model/backend configuration (reported: $actual; expected: $ExpectedAlias). Stop that server or use the external Vision server option explicitly."
-	}
-}
-
 $scriptRoot = Split-Path -Parent $MyInvocation.MyCommand.Path
 $addonRoot = Resolve-Path (Join-Path $scriptRoot "..")
 $rankingScript = Join-Path $scriptRoot "run-model-informed-montage-smoke.ps1"
@@ -321,9 +304,6 @@ if ($localVision) {
 	if (!$?) {
 		throw "The local llama.cpp Vision model did not start."
 	}
-	Assert-LocalVisionServerIdentity `
-		-ServerUrl $VisionServerUrl `
-		-ExpectedAlias $localVisionServerAlias
 }
 
 $outputDirectory = Split-Path -Parent $resolvedOutput
