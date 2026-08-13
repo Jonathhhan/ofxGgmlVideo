@@ -37,6 +37,7 @@ private:
 	std::string handoffText;
 	std::string videoPath;
 	std::string renderOutputPath;
+	std::string activeRenderOutputPath;
 	std::string workflowScript;
 	std::string visionModel;
 	std::string visionModelPath;
@@ -48,6 +49,7 @@ private:
 	bool renderRunning = false;
 	bool videoPaused = false;
 	bool useExternalVisionServer = false;
+	int localVisionBackendIndex = 0;
 	std::future<int> renderFuture;
 	ofVideoPlayer videoPlayer;
 	ofxImGui::Gui gui;

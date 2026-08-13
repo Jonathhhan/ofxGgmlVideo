@@ -37,8 +37,9 @@ MontageAutomat substrate example. Generate it with the openFrameworks
 projectGenerator using addons `ofxGgmlVideo` and `ofxImGui`.
 It shows clip-window controls, deterministic frame references, ordered montage
 segments, transition and handle controls, beat-marker controls, a simple
-timeline preview, and an edit-decision-list plus machine-readable manifest
-handoff without claiming autonomous editing or media decoding.
+timeline preview, an edit-decision-list plus machine-readable manifest handoff,
+a decoded video preview, and real FFmpeg MP4 rendering without claiming
+autonomous editing.
 
 The example subsumes the former single-request frame smoke: every clip exposes
 its temporal start, duration, sample rate, and maximum frame count, and every
@@ -48,9 +49,12 @@ captions remain a model-backed boundary exercised by
 `scripts/run-model-informed-montage-smoke.*` against a vision-capable
 OpenAI-compatible server; the GUI does not simulate captions. The GUI defaults
 to local llama.cpp inference: choose the Vision-model GGUF and its matching
-`mmproj` GGUF with file dialogs, then start a Vision-ranked render. The workflow
-reuses `ofxGgmlVision` to launch the CUDA-backed local server. An external
-OpenAI-compatible Vision server remains available through an explicit checkbox.
+`mmproj` GGUF with file dialogs, select `CUDA` or `CPU`, then start a
+Vision-ranked render. The workflow reuses `ofxGgmlVision` to launch the local
+llama.cpp server with 99 GPU layers for CUDA or zero GPU layers for CPU, and it
+reports the selected backend in dry-run and result metadata. The script exposes
+the same choice as `-VisionBackend cuda|cpu`. An external OpenAI-compatible
+Vision server remains available through an explicit checkbox.
 
 For video-lane planning, temporal boundaries, and generated media rules, see
 [docs/VIDEO_WORKFLOWS.md](docs/VIDEO_WORKFLOWS.md).

@@ -95,6 +95,8 @@ Assert-FileContains (Join-Path $montageExampleRoot "src\ofApp.cpp") "ofDisableAr
 Assert-FileContains (Join-Path $montageExampleRoot "src\ofApp.cpp") "Browse local Vision model GGUF" "montage example local Vision model browser"
 Assert-FileContains (Join-Path $montageExampleRoot "src\ofApp.cpp") "Browse Vision mmproj GGUF" "montage example local Vision projector browser"
 Assert-FileContains (Join-Path $montageExampleRoot "src\ofApp.cpp") "Render Vision-ranked MP4 \(local CUDA\)" "montage example local CUDA render path"
+Assert-FileContains (Join-Path $montageExampleRoot "src\ofApp.cpp") "Render Vision-ranked MP4 \(local CPU\)" "montage example local CPU render path"
+Assert-FileContains (Join-Path $scriptRoot "run-video-montage-workflow.ps1") "VisionBackend" "montage workflow local backend selection"
 Assert-FileContains (Join-Path $scriptRoot "run-video-montage-workflow.ps1") "start-local-vision-server.ps1" "montage workflow local Vision launcher handoff"
 
 Assert-Path (Join-Path $addonRoot "tests\CMakeLists.txt") "test CMakeLists"

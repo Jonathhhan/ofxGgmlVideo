@@ -67,6 +67,9 @@ void ofApp::setup() {
 	if (const auto configuredMmprojPath = getEnvironmentValue("OFXGGML_VISION_MMPROJ"); !configuredMmprojPath.empty()) {
 		visionMmprojPath = configuredMmprojPath;
 	}
+	if (const auto configuredGpuLayers = getEnvironmentValue("OFXGGML_VISION_GPU_LAYERS"); configuredGpuLayers == "0") {
+		localVisionBackendIndex = 1;
+	}
 
 	clips.push_back(makeClip("videos/interview.mp4", "opening statement", 4.0, 3.0, 1.0, 3, {"dialog", "select"}));
 	clips.push_back(makeClip("videos/broll.mp4", "hands and process", 18.0, 4.0, 1.0, 4, {"broll", "texture"}));
@@ -91,13 +94,14 @@ void ofApp::update() {
 		renderFuture.wait_for(std::chrono::milliseconds(0)) == std::future_status::ready) {
 		const int exitCode = renderFuture.get();
 		renderRunning = false;
-		if (exitCode == 0 && ofFile::doesFileExist(renderOutputPath)) {
-			renderStatus = "Rendered MP4: " + renderOutputPath;
+		if (exitCode == 0 && ofFile::doesFileExist(activeRenderOutputPath)) {
+			renderStatus = "Rendered MP4: " + activeRenderOutputPath;
 			ofLogNotice("ofxGgmlVideoMontageExample") << renderStatus;
 		} else {
 			renderStatus = "Render failed with exit code " + ofToString(exitCode) + ". See the console for the first FFmpeg or Vision error.";
 			ofLogError("ofxGgmlVideoMontageExample") << renderStatus;
 		}
+		activeRenderOutputPath.clear();
 	}
 }
 
@@ -207,18 +211,21 @@ void ofApp::startRender(const bool modelBacked) {
 				<< " -VisionServerUrl " << quote(visionServerUrl);
 		} else {
 			command << " -VisionModelPath " << quote(visionModelPath)
-				<< " -VisionMmprojPath " << quote(visionMmprojPath);
+				<< " -VisionMmprojPath " << quote(visionMmprojPath)
+				<< " -VisionBackend " << (localVisionBackendIndex == 0 ? "cuda" : "cpu");
 		}
 	} else {
 		command << " -SkipVision";
 	}
 
+	const std::string localBackendLabel = localVisionBackendIndex == 0 ? "CUDA" : "CPU";
 	renderStatus = modelBacked
 		? (useExternalVisionServer
 			? "External Vision ranking and MP4 render running..."
-			: "Local CUDA Vision ranking and MP4 render running...")
+			: "Local " + localBackendLabel + " Vision ranking and MP4 render running...")
 		: "Deterministic MP4 render running...";
 	renderRunning = true;
+	activeRenderOutputPath = renderOutputPath;
 	const std::string commandText = command.str();
 	renderFuture = std::async(std::launch::async, [commandText]() {
 		return std::system(commandText.c_str());
@@ -304,6 +311,9 @@ void ofApp::drawVideoInput() {
 			ImGui::InputText("Vision model ID", &visionModel);
 			ImGui::InputText("Vision server URL", &visionServerUrl);
 		} else {
+			const char * localBackends[] = {"CUDA", "CPU"};
+			ImGui::Combo("Local Vision backend", &localVisionBackendIndex, localBackends, 2);
+			ImGui::Text("Selected backend: %s", localBackends[localVisionBackendIndex]);
 			ImGui::InputText("Vision model GGUF", &visionModelPath);
 			if (ImGui::Button("Browse local Vision model GGUF...")) {
 				chooseVisionModel();
@@ -312,7 +322,9 @@ void ofApp::drawVideoInput() {
 			if (ImGui::Button("Browse Vision mmproj GGUF...")) {
 				chooseVisionMmproj();
 			}
-			ImGui::TextUnformatted("The Vision workflow starts local llama.cpp on CUDA when rendering.");
+			ImGui::TextUnformatted(localVisionBackendIndex == 0
+				? "CUDA offloads model layers to the GPU."
+				: "CPU keeps all model layers on the CPU.");
 		}
 		if (ImGui::Button("Render deterministic MP4")) {
 			startRender(false);
@@ -320,7 +332,9 @@ void ofApp::drawVideoInput() {
 		ImGui::SameLine();
 		if (ImGui::Button(useExternalVisionServer
 			? "Render Vision-ranked MP4"
-			: "Render Vision-ranked MP4 (local CUDA)")) {
+			: (localVisionBackendIndex == 0
+				? "Render Vision-ranked MP4 (local CUDA)"
+				: "Render Vision-ranked MP4 (local CPU)"))) {
 			startRender(true);
 		}
 	}

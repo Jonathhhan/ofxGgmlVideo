@@ -48,14 +48,29 @@ try {
 		-OutputPath $outputVideo `
 		-VisionModelPath $visionModel `
 		-VisionMmprojPath $visionMmproj `
+		-VisionBackend cpu `
 		-SampleCount 3 `
 		-MaxOutputSegments 2 `
 		-DryRun `
 		-Json)
 	$localVisionPlan = ($localVisionOutput -join [Environment]::NewLine) | ConvertFrom-Json
 	if (!$localVisionPlan.Ready -or !$localVisionPlan.ModelBacked -or !$localVisionPlan.LocalVision -or
-		$localVisionPlan.VisionModel -ne "vision-model" -or $localVisionPlan.VisionServerUrl -ne "http://127.0.0.1:8082") {
+		$localVisionPlan.VisionModel -ne "vision-model" -or $localVisionPlan.VisionServerUrl -ne "http://127.0.0.1:8082" -or
+		$localVisionPlan.VisionBackend -ne "cpu" -or [string]$localVisionPlan.VisionGpuLayers -ne "0") {
 		throw "Video montage workflow dry-run did not preserve the local Vision model handoff."
+	}
+
+	$localCudaOutput = @(& $workflowScript `
+		-Video $inputVideo `
+		-OutputPath $outputVideo `
+		-VisionModelPath $visionModel `
+		-VisionMmprojPath $visionMmproj `
+		-VisionBackend cuda `
+		-DryRun `
+		-Json)
+	$localCudaPlan = ($localCudaOutput -join [Environment]::NewLine) | ConvertFrom-Json
+	if ($localCudaPlan.VisionBackend -ne "cuda" -or [string]$localCudaPlan.VisionGpuLayers -ne "99") {
+		throw "Video montage workflow dry-run did not preserve the CUDA backend selection."
 	}
 
 	$renderOutput = @(& $workflowScript `

@@ -7,6 +7,8 @@ param(
 	[string]$VisionServerUrl = $(if ($env:OFXGGML_VISION_SERVER_URL) { $env:OFXGGML_VISION_SERVER_URL } else { "http://127.0.0.1:8080" }),
 	[string]$VisionModelPath = $(if ($env:OFXGGML_VISION_MODEL) { $env:OFXGGML_VISION_MODEL } else { "" }),
 	[string]$VisionMmprojPath = $(if ($env:OFXGGML_VISION_MMPROJ) { $env:OFXGGML_VISION_MMPROJ } else { "" }),
+	[ValidateSet("cuda", "cpu")]
+	[string]$VisionBackend = "cuda",
 	[int]$SampleCount = 6,
 	[int]$MaxOutputSegments = 4,
 	[double]$SegmentDurationSeconds = 2.0,
@@ -91,6 +93,7 @@ if ($SegmentDurationSeconds -le 0) {
 	throw "SegmentDurationSeconds must be greater than zero."
 }
 $localVision = !$SkipVision -and ![string]::IsNullOrWhiteSpace($VisionModelPath)
+$visionGpuLayers = if ($VisionBackend -eq "cpu") { "0" } else { "99" }
 if ($localVision) {
 	$expandedVisionModel = [Environment]::ExpandEnvironmentVariables($VisionModelPath)
 	$expandedVisionMmproj = [Environment]::ExpandEnvironmentVariables($VisionMmprojPath)
@@ -147,6 +150,8 @@ $plan = [ordered]@{
 	VisionModelPath = $(if ($localVision) { $VisionModelPath } else { "" })
 	VisionMmprojPath = $(if ($localVision) { $VisionMmprojPath } else { "" })
 	VisionServerUrl = $(if ($SkipVision) { "" } else { $VisionServerUrl })
+	VisionBackend = $(if ($SkipVision) { "none" } elseif ($localVision) { $VisionBackend } else { "external" })
+	VisionGpuLayers = $(if ($localVision) { $visionGpuLayers } else { "" })
 	Ffmpeg = $ffmpeg
 	Ffprobe = $ffprobe
 	SampleTimesSeconds = @($sampleTimes | ForEach-Object { [Math]::Round($_, 6) })
@@ -163,7 +168,8 @@ if ($localVision) {
 	& $localVisionLauncher `
 		-ModelPath $VisionModelPath `
 		-MmprojPath $VisionMmprojPath `
-		-Alias $VisionModel
+		-Alias $VisionModel `
+		-GpuLayers $visionGpuLayers
 	if (!$?) {
 		throw "The local llama.cpp Vision model did not start."
 	}
@@ -340,6 +346,8 @@ try {
 		InferenceChecked = $modelBacked
 		ScoringOwner = $scoringOwner
 		VisionModel = $(if ($modelBacked) { $VisionModel } else { "" })
+		VisionBackend = $(if (!$modelBacked) { "none" } elseif ($localVision) { $VisionBackend } else { "external" })
+		VisionGpuLayers = $(if ($localVision) { $visionGpuLayers } else { "" })
 		SegmentCount = $segments.Count
 		Segments = $segments
 		FramesDirectory = $(if ($KeepFrames) { $framesRoot } else { "" })
