@@ -3,6 +3,7 @@ Set-StrictMode -Version Latest
 
 $scriptRoot = Split-Path -Parent $MyInvocation.MyCommand.Path
 $workflowScript = Join-Path $scriptRoot "run-video-montage-workflow.ps1"
+$rankingScript = Join-Path $scriptRoot "run-model-informed-montage-smoke.ps1"
 $ffmpeg = Get-Command ffmpeg -ErrorAction SilentlyContinue
 $ffprobe = Get-Command ffprobe -ErrorAction SilentlyContinue
 if (!$ffmpeg -or !$ffprobe) {
@@ -43,6 +44,26 @@ try {
 
 	[void](New-Item -ItemType File -Path $visionModel)
 	[void](New-Item -ItemType File -Path $visionMmproj)
+	$testVisionModel = $visionModel
+	$testVisionMmproj = $visionMmproj
+	$null = . $rankingScript `
+		-Images @($visionModel, $visionMmproj) `
+		-MontagePrompt "Prefer the image with the most visual detail and varied structure." `
+		-VisionModel "dry-run-model" `
+		-DryRun `
+		-Json
+	$scoringTokens = @(Get-ScoringTokens -Text "Prefer the image with the most visual detail and varied structure.")
+	if (($scoringTokens -join ",") -ne "detail,varied,structure") {
+		throw "Model-informed ranking did not remove generic visual prompt words."
+	}
+	$relatedTokens = @(Get-MatchedPromptTokens `
+		-PromptTokens @("detail", "varied", "structure") `
+		-CaptionTokens @("detailed", "various", "structural"))
+	if (($relatedTokens -join ",") -ne "detail,varied,structure") {
+		throw "Model-informed ranking did not match related word forms."
+	}
+	$visionModel = $testVisionModel
+	$visionMmproj = $testVisionMmproj
 	$localVisionOutput = @(& $workflowScript `
 		-Video $inputVideo `
 		-OutputPath $outputVideo `

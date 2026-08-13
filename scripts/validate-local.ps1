@@ -112,6 +112,8 @@ Assert-Path (Join-Path $scriptRoot "run-video-runtime-smoke.sh") "Video runtime 
 Assert-Path (Join-Path $scriptRoot "test-video-runtime-smoke.ps1") "Video runtime smoke contract test"
 Assert-Path (Join-Path $scriptRoot "run-model-informed-montage-smoke.ps1") "model-informed montage smoke"
 Assert-Path (Join-Path $scriptRoot "run-model-informed-montage-smoke.bat") "model-informed montage smoke Windows wrapper"
+Assert-FileContains (Join-Path $scriptRoot "run-model-informed-montage-smoke.ps1") "Get-ScoringTokens" "model-informed montage prompt filtering"
+Assert-FileContains (Join-Path $scriptRoot "run-model-informed-montage-smoke.ps1") "Get-MatchedPromptTokens" "model-informed montage word-form matching"
 Assert-Path (Join-Path $scriptRoot "test-video-montage-workflow.ps1") "video montage workflow test"
 
 $nestedExamples = Join-Path $addonRoot "examples"

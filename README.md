@@ -62,6 +62,12 @@ running server's model identity. A server on the local Vision port with a
 different model or backend is reported as a conflict instead of being silently
 reused.
 
+Frame ranking remains deterministic over real Vision captions. Generic request
+words such as `image`, `visual`, and `prefer` do not create false ties, while
+near word forms such as `varied`/`various` and `detail`/`detailed` match. The
+workflow does not trust an unverified numeric score emitted by a small Vision
+model.
+
 For video-lane planning, temporal boundaries, and generated media rules, see
 [docs/VIDEO_WORKFLOWS.md](docs/VIDEO_WORKFLOWS.md).
 

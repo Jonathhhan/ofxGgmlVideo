@@ -21,6 +21,28 @@ function Get-MeaningfulTokens {
 		Select-Object -Unique)
 }
 
+function Get-ScoringTokens {
+	param([string] $Text)
+	$tokens = @(Get-MeaningfulTokens -Text $Text)
+	$genericVisualWords = @("frame", "frames", "image", "images", "montage", "most", "picture", "pictures", "prefer", "preferred", "visual", "visually")
+	$specific = @($tokens | Where-Object { $_ -notin $genericVisualWords })
+	return $(if ($specific.Count -gt 0) { $specific } else { $tokens })
+}
+
+function Get-MatchedPromptTokens {
+	param(
+		[string[]] $PromptTokens,
+		[string[]] $CaptionTokens
+	)
+	return @($PromptTokens | Where-Object {
+		$promptToken = $_
+		$CaptionTokens | Where-Object {
+			$_ -eq $promptToken -or
+			($_.Length -ge 5 -and $promptToken.Length -ge 5 -and $_.Substring(0, 4) -eq $promptToken.Substring(0, 4))
+		} | Select-Object -First 1
+	})
+}
+
 function ConvertFrom-SmokeJson {
 	param([object[]] $Output)
 	$text = ($Output | ForEach-Object { $_.ToString() }) -join "`n"
@@ -69,7 +91,7 @@ if ($DryRun) {
 	return
 }
 
-$goalTokens = @(Get-MeaningfulTokens -Text $MontagePrompt)
+$goalTokens = @(Get-ScoringTokens -Text $MontagePrompt)
 if ($goalTokens.Count -eq 0) { throw "MontagePrompt did not contain meaningful scoring tokens." }
 $started = Get-Date
 $candidates = @()
@@ -95,7 +117,7 @@ for ($index = 0; $index -lt $resolvedImages.Count; $index++) {
 		throw "Vision did not describe montage frame after $attemptUsed attempts: $image"
 	}
 	$captionTokens = @(Get-MeaningfulTokens -Text ([string] $vision.Text))
-	$matches = @($goalTokens | Where-Object { $_ -in $captionTokens })
+	$matches = @(Get-MatchedPromptTokens -PromptTokens $goalTokens -CaptionTokens $captionTokens)
 	$score = [Math]::Round($matches.Count / [double]$goalTokens.Count, 6)
 	$candidates += [pscustomobject]@{
 		OriginalIndex = $index
