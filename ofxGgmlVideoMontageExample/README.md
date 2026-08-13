@@ -23,5 +23,10 @@ llama.cpp server. An already-running OpenAI-compatible Vision server remains
 available through the external-server toggle. The server owns inference; this
 example and the Video addon own the montage boundary.
 
+The local workflow also verifies that a reused server exposes the identity
+derived from the selected model, projector, and backend. If port 8082 belongs to
+another configuration, rendering stops with a clear conflict instead of
+claiming the newly selected backend.
+
 Generate the project with the openFrameworks projectGenerator using addons
 `ofxGgmlVideo`, `ofxGgmlCore`, and `ofxImGui`.

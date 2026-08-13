@@ -69,6 +69,40 @@ function Get-VideoDuration {
 	return $duration
 }
 
+function Get-LocalVisionServerAlias {
+	param(
+		[string]$ModelPath,
+		[string]$MmprojPath,
+		[string]$Backend
+	)
+	$signature = "$ModelPath|$MmprojPath|$Backend"
+	$sha256 = [Security.Cryptography.SHA256]::Create()
+	try {
+		$hash = $sha256.ComputeHash([Text.Encoding]::UTF8.GetBytes($signature))
+	} finally {
+		$sha256.Dispose()
+	}
+	$suffix = -join @($hash[0..5] | ForEach-Object { $_.ToString("x2") })
+	return "ofxggml-video-$Backend-$suffix"
+}
+
+function Assert-LocalVisionServerIdentity {
+	param(
+		[string]$ServerUrl,
+		[string]$ExpectedAlias
+	)
+	try {
+		$response = Invoke-RestMethod -Uri "$($ServerUrl.TrimEnd('/'))/v1/models" -Method Get -TimeoutSec 5
+	} catch {
+		throw "Local Vision server became reachable but its model identity could not be read: $($_.Exception.Message)"
+	}
+	$modelIds = @($response.data | ForEach-Object { [string]$_.id })
+	if ($modelIds -notcontains $ExpectedAlias) {
+		$actual = if ($modelIds.Count -gt 0) { $modelIds -join ", " } else { "<none>" }
+		throw "Local Vision port is occupied by a different model/backend configuration (reported: $actual; expected: $ExpectedAlias). Stop that server or use the external Vision server option explicitly."
+	}
+}
+
 $scriptRoot = Split-Path -Parent $MyInvocation.MyCommand.Path
 $addonRoot = Resolve-Path (Join-Path $scriptRoot "..")
 $rankingScript = Join-Path $scriptRoot "run-model-informed-montage-smoke.ps1"
@@ -92,8 +126,10 @@ if ($MaxOutputSegments -lt 1 -or $MaxOutputSegments -gt $SampleCount) {
 if ($SegmentDurationSeconds -le 0) {
 	throw "SegmentDurationSeconds must be greater than zero."
 }
+$VisionBackend = $VisionBackend.ToLowerInvariant()
 $localVision = !$SkipVision -and ![string]::IsNullOrWhiteSpace($VisionModelPath)
 $visionGpuLayers = if ($VisionBackend -eq "cpu") { "0" } else { "99" }
+$localVisionServerAlias = ""
 if ($localVision) {
 	$expandedVisionModel = [Environment]::ExpandEnvironmentVariables($VisionModelPath)
 	$expandedVisionMmproj = [Environment]::ExpandEnvironmentVariables($VisionMmprojPath)
@@ -105,6 +141,10 @@ if ($localVision) {
 	$VisionModelPath = (Resolve-Path -LiteralPath $expandedVisionModel).Path
 	$VisionMmprojPath = (Resolve-Path -LiteralPath $expandedVisionMmproj).Path
 	$VisionModel = [System.IO.Path]::GetFileNameWithoutExtension($VisionModelPath)
+	$localVisionServerAlias = Get-LocalVisionServerAlias `
+		-ModelPath $VisionModelPath `
+		-MmprojPath $VisionMmprojPath `
+		-Backend $VisionBackend
 	$VisionServerUrl = "http://127.0.0.1:8082"
 } elseif (!$SkipVision -and [string]::IsNullOrWhiteSpace($VisionModel)) {
 	throw "Pass local -VisionModelPath plus -VisionMmprojPath, pass -VisionModel for an external server, or use -SkipVision."
@@ -147,6 +187,7 @@ $plan = [ordered]@{
 	ModelBacked = !$SkipVision
 	LocalVision = $localVision
 	VisionModel = $(if ($SkipVision) { "" } else { $VisionModel })
+	VisionServerModel = $(if ($localVision) { $localVisionServerAlias } elseif ($SkipVision) { "" } else { $VisionModel })
 	VisionModelPath = $(if ($localVision) { $VisionModelPath } else { "" })
 	VisionMmprojPath = $(if ($localVision) { $VisionMmprojPath } else { "" })
 	VisionServerUrl = $(if ($SkipVision) { "" } else { $VisionServerUrl })
@@ -168,11 +209,14 @@ if ($localVision) {
 	& $localVisionLauncher `
 		-ModelPath $VisionModelPath `
 		-MmprojPath $VisionMmprojPath `
-		-Alias $VisionModel `
+		-Alias $localVisionServerAlias `
 		-GpuLayers $visionGpuLayers
 	if (!$?) {
 		throw "The local llama.cpp Vision model did not start."
 	}
+	Assert-LocalVisionServerIdentity `
+		-ServerUrl $VisionServerUrl `
+		-ExpectedAlias $localVisionServerAlias
 }
 
 $outputDirectory = Split-Path -Parent $resolvedOutput
@@ -216,7 +260,7 @@ try {
 		$rankingOutput = @(& $rankingScript `
 			-Images @($frameRecords.FramePath) `
 			-MontagePrompt $MontagePrompt `
-			-VisionModel $VisionModel `
+			-VisionModel $(if ($localVision) { $localVisionServerAlias } else { $VisionModel }) `
 			-VisionServerUrl $VisionServerUrl `
 			-SegmentDurationSeconds $SegmentDurationSeconds `
 			-Json 2>&1 | ForEach-Object { [string]$_ })
@@ -346,6 +390,7 @@ try {
 		InferenceChecked = $modelBacked
 		ScoringOwner = $scoringOwner
 		VisionModel = $(if ($modelBacked) { $VisionModel } else { "" })
+		VisionServerModel = $(if ($localVision) { $localVisionServerAlias } elseif ($modelBacked) { $VisionModel } else { "" })
 		VisionBackend = $(if (!$modelBacked) { "none" } elseif ($localVision) { $VisionBackend } else { "external" })
 		VisionGpuLayers = $(if ($localVision) { $visionGpuLayers } else { "" })
 		SegmentCount = $segments.Count

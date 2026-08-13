@@ -56,6 +56,12 @@ reports the selected backend in dry-run and result metadata. The script exposes
 the same choice as `-VisionBackend cuda|cpu`. An external OpenAI-compatible
 Vision server remains available through an explicit checkbox.
 
+Local server reuse is configuration-safe: the workflow derives a stable server
+alias from the Vision GGUF, mmproj GGUF, and selected backend, then checks the
+running server's model identity. A server on the local Vision port with a
+different model or backend is reported as a conflict instead of being silently
+reused.
+
 For video-lane planning, temporal boundaries, and generated media rules, see
 [docs/VIDEO_WORKFLOWS.md](docs/VIDEO_WORKFLOWS.md).
 

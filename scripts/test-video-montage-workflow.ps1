@@ -56,7 +56,8 @@ try {
 	$localVisionPlan = ($localVisionOutput -join [Environment]::NewLine) | ConvertFrom-Json
 	if (!$localVisionPlan.Ready -or !$localVisionPlan.ModelBacked -or !$localVisionPlan.LocalVision -or
 		$localVisionPlan.VisionModel -ne "vision-model" -or $localVisionPlan.VisionServerUrl -ne "http://127.0.0.1:8082" -or
-		$localVisionPlan.VisionBackend -ne "cpu" -or [string]$localVisionPlan.VisionGpuLayers -ne "0") {
+		$localVisionPlan.VisionBackend -ne "cpu" -or [string]$localVisionPlan.VisionGpuLayers -ne "0" -or
+		$localVisionPlan.VisionServerModel -notmatch '^ofxggml-video-cpu-[0-9a-f]{12}$') {
 		throw "Video montage workflow dry-run did not preserve the local Vision model handoff."
 	}
 
@@ -71,6 +72,10 @@ try {
 	$localCudaPlan = ($localCudaOutput -join [Environment]::NewLine) | ConvertFrom-Json
 	if ($localCudaPlan.VisionBackend -ne "cuda" -or [string]$localCudaPlan.VisionGpuLayers -ne "99") {
 		throw "Video montage workflow dry-run did not preserve the CUDA backend selection."
+	}
+	if ($localCudaPlan.VisionServerModel -notmatch '^ofxggml-video-cuda-[0-9a-f]{12}$' -or
+		$localCudaPlan.VisionServerModel -eq $localVisionPlan.VisionServerModel) {
+		throw "Video montage workflow did not bind the local server identity to its backend configuration."
 	}
 
 	$renderOutput = @(& $workflowScript `

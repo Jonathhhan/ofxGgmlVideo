@@ -97,6 +97,7 @@ Assert-FileContains (Join-Path $montageExampleRoot "src\ofApp.cpp") "Browse Visi
 Assert-FileContains (Join-Path $montageExampleRoot "src\ofApp.cpp") "Render Vision-ranked MP4 \(local CUDA\)" "montage example local CUDA render path"
 Assert-FileContains (Join-Path $montageExampleRoot "src\ofApp.cpp") "Render Vision-ranked MP4 \(local CPU\)" "montage example local CPU render path"
 Assert-FileContains (Join-Path $scriptRoot "run-video-montage-workflow.ps1") "VisionBackend" "montage workflow local backend selection"
+Assert-FileContains (Join-Path $scriptRoot "run-video-montage-workflow.ps1") "Assert-LocalVisionServerIdentity" "montage workflow local server identity check"
 Assert-FileContains (Join-Path $scriptRoot "run-video-montage-workflow.ps1") "start-local-vision-server.ps1" "montage workflow local Vision launcher handoff"
 
 Assert-Path (Join-Path $addonRoot "tests\CMakeLists.txt") "test CMakeLists"
