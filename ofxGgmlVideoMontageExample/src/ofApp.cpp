@@ -95,7 +95,7 @@ void ofApp::update() {
 		const int exitCode = renderFuture.get();
 		renderRunning = false;
 		if (exitCode == 0 && ofFile::doesFileExist(activeRenderOutputPath)) {
-			renderStatus = "Rendered planned clip windows as MP4 (hard cuts): " + activeRenderOutputPath;
+			renderStatus = "Rendered the planned montage as MP4: " + activeRenderOutputPath;
 			ofLogNotice("ofxGgmlVideoMontageExample") << renderStatus;
 		} else {
 			renderStatus = "Render failed with exit code " + ofToString(exitCode) + ". See the console for the first FFmpeg or Vision error.";
@@ -247,7 +247,7 @@ void ofApp::startRender(const bool modelBacked) {
 		? (useExternalVisionServer
 			? "External Vision ranking of the planned clip windows and MP4 render running..."
 			: "Local " + localBackendLabel + " Vision ranking of the planned clip windows and MP4 render running...")
-		: "Rendering the planned clip windows as a deterministic MP4...";
+		: "Rendering the planned clip windows and transitions as a deterministic MP4...";
 	renderRunning = true;
 	activeRenderOutputPath = renderOutputPath;
 	activeManifestPath = manifestPath.string();
@@ -362,7 +362,7 @@ void ofApp::drawVideoInput() {
 				: "Render Vision-ranked MP4 (local CPU)"))) {
 			startRender(true);
 		}
-		ImGui::TextUnformatted("Source windows come from the visible montage; transition metadata currently renders as hard cuts.");
+		ImGui::TextUnformatted("Source windows and overlapping transitions come from the visible montage; non-overlapping transitions remain hard cuts.");
 	}
 	if (renderRunning) {
 		ImGui::TextUnformatted("Render running; the UI remains responsive.");

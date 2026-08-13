@@ -54,6 +54,16 @@ function Format-Seconds {
 	return $Value.ToString("0.######", [Globalization.CultureInfo]::InvariantCulture)
 }
 
+function Resolve-XfadeTransition {
+	param([string]$Kind)
+	switch ($Kind.ToLowerInvariant()) {
+		"crossfade" { return "fade" }
+		"dip" { return "fadeblack" }
+		"wipe" { return "wipeleft" }
+		default { throw "Unsupported overlapping montage transition '$Kind'. Use cut, crossfade, dip, or wipe." }
+	}
+}
+
 function Get-VideoDuration {
 	param([string]$Ffprobe, [string]$Path)
 	$output = Invoke-NativeCapture -Executable $Ffprobe -Label "ffprobe duration" -Arguments @(
@@ -157,6 +167,9 @@ $durationSeconds = Get-VideoDuration -Ffprobe $ffprobe -Path $resolvedVideo
 $manifestDriven = ![string]::IsNullOrWhiteSpace($MontageManifestPath)
 $resolvedManifestPath = ""
 $manifestSegments = @()
+$manifestOverlapTransitions = $false
+$manifestTransitionKind = "cut"
+$manifestTransitionSeconds = 0.0
 if ($manifestDriven) {
 	$expandedManifestPath = [Environment]::ExpandEnvironmentVariables($MontageManifestPath)
 	if (![System.IO.Path]::IsPathRooted($expandedManifestPath)) {
@@ -174,6 +187,9 @@ if ($manifestDriven) {
 	if ([string]$manifest.kind -ne "ofxGgmlVideoMontageManifest" -or [int]$manifest.version -ne 1) {
 		throw "Montage manifest must use kind 'ofxGgmlVideoMontageManifest' and version 1."
 	}
+	$manifestOverlapTransitions = [bool]$manifest.options.overlapTransitions
+	$manifestTransitionKind = ([string]$manifest.options.transitionKind).ToLowerInvariant()
+	$manifestTransitionSeconds = [double]$manifest.options.transitionSeconds
 	$rawSegments = @($manifest.segments)
 	if ($rawSegments.Count -lt 1) {
 		throw "Montage manifest must contain at least one segment."
@@ -222,6 +238,21 @@ if ($manifestDriven) {
 	}
 }
 
+$plannedTransitionRendering = "hard-cut"
+$plannedTransitionCount = 0
+if ($manifestDriven -and $manifestOverlapTransitions -and $manifestSegments.Count -gt 1) {
+	$plannedTransitions = @($manifestSegments | Select-Object -First $MaxOutputSegments | Select-Object -Skip 1 | Where-Object {
+		$_.TransitionInSeconds -gt 0 -and $_.TransitionInKind.ToLowerInvariant() -ne "cut"
+	})
+	foreach ($plannedTransition in $plannedTransitions) {
+		[void](Resolve-XfadeTransition -Kind $plannedTransition.TransitionInKind)
+	}
+	$plannedTransitionCount = $plannedTransitions.Count
+	if ($plannedTransitionCount -gt 0) {
+		$plannedTransitionRendering = "ffmpeg-xfade"
+	}
+}
+
 if ([string]::IsNullOrWhiteSpace($OutputPath)) {
 	$outputDirectory = Split-Path -Parent $resolvedVideo
 	$outputName = ([System.IO.Path]::GetFileNameWithoutExtension($resolvedVideo)) + ".montage.mp4"
@@ -254,7 +285,8 @@ $plan = [ordered]@{
 	DurationSeconds = [Math]::Round($durationSeconds, 6)
 	ManifestDriven = $manifestDriven
 	MontageManifestPath = $resolvedManifestPath
-	TransitionRendering = "hard-cut"
+	TransitionRendering = $plannedTransitionRendering
+	TransitionCount = $plannedTransitionCount
 	SampleCount = $SampleCount
 	MaxOutputSegments = $MaxOutputSegments
 	SegmentDurationSeconds = $SegmentDurationSeconds
@@ -410,28 +442,81 @@ try {
 			TransitionInSeconds = [double]$frame.TransitionInSeconds
 			TransitionOutKind = [string]$frame.TransitionOutKind
 			TransitionOutSeconds = [double]$frame.TransitionOutSeconds
+			RenderedTransitionInKind = "cut"
+			RenderedTransitionInSeconds = 0.0
 		}
 	}
 
 	$filterParts = @()
-	$concatInputs = ""
 	foreach ($segment in $segments) {
 		$start = Format-Seconds ([double]$segment.SourceStartSeconds)
 		$length = Format-Seconds ([double]$segment.DurationSeconds)
 		$label = "v$($segment.Index)"
-		$filterParts += "[0:v]trim=start=$start`:duration=$length,setpts=PTS-STARTPTS,scale=trunc(iw/2)*2:trunc(ih/2)*2[$label]"
-		$concatInputs += "[$label]"
+		$filterParts += "[0:v]trim=start=$start`:duration=$length,setpts=PTS-STARTPTS,settb=AVTB,scale=trunc(iw/2)*2:trunc(ih/2)*2,setsar=1[$label]"
 		if ($hasSourceAudio) {
 			$audioLabel = "a$($segment.Index)"
-			$filterParts += "[0:a]atrim=start=$start`:duration=$length,asetpts=PTS-STARTPTS[$audioLabel]"
-			$concatInputs += "[$audioLabel]"
+			$filterParts += "[0:a]atrim=start=$start`:duration=$length,asetpts=PTS-STARTPTS,aresample=48000[$audioLabel]"
 		}
 	}
-	if ($hasSourceAudio) {
-		$filterParts += "$concatInputs`concat=n=$($segments.Count):v=1:a=1[outv][outa]"
+
+	$renderedTransitions = @()
+	if ($segments.Count -eq 1) {
+		$filterParts += "[v0]null[outv]"
+		if ($hasSourceAudio) {
+			$filterParts += "[a0]anull[outa]"
+		}
 	} else {
-		$filterParts += "$concatInputs`concat=n=$($segments.Count):v=1:a=0[outv]"
+		$currentVideoLabel = "v0"
+		$currentAudioLabel = "a0"
+		$currentDuration = [double]$segments[0].DurationSeconds
+		for ($index = 1; $index -lt $segments.Count; $index++) {
+			$segment = $segments[$index]
+			$previousSegment = $segments[$index - 1]
+			$transitionKind = ([string]$segment.TransitionInKind).ToLowerInvariant()
+			$requestedTransition = [double]$segment.TransitionInSeconds
+			if ($modelBacked) {
+				$transitionKind = $manifestTransitionKind
+				$requestedTransition = $manifestTransitionSeconds
+			}
+			$transitionSeconds = 0.0
+			if ($manifestDriven -and $manifestOverlapTransitions -and $transitionKind -ne "cut" -and $requestedTransition -gt 0) {
+				$transitionSeconds = [Math]::Min($requestedTransition,
+					[Math]::Min([double]$previousSegment.DurationSeconds * 0.5, [double]$segment.DurationSeconds * 0.5))
+			}
+
+			$outputVideoLabel = if ($index + 1 -eq $segments.Count) { "outv" } else { "vmix$index" }
+			$outputAudioLabel = if ($index + 1 -eq $segments.Count) { "outa" } else { "amix$index" }
+			if ($transitionSeconds -gt 0) {
+				$xfadeTransition = Resolve-XfadeTransition -Kind $transitionKind
+				$durationText = Format-Seconds $transitionSeconds
+				$offsetText = Format-Seconds ([Math]::Max(0.0, $currentDuration - $transitionSeconds))
+				$filterParts += "[$currentVideoLabel][v$index]xfade=transition=$xfadeTransition`:duration=$durationText`:offset=$offsetText[$outputVideoLabel]"
+				if ($hasSourceAudio) {
+					$filterParts += "[$currentAudioLabel][a$index]acrossfade=d=$durationText`:c1=tri`:c2=tri[$outputAudioLabel]"
+				}
+				$segment.RenderedTransitionInKind = $transitionKind
+				$segment.RenderedTransitionInSeconds = [Math]::Round($transitionSeconds, 6)
+				$renderedTransitions += [pscustomobject]@{
+					FromSegment = [int]$previousSegment.OriginalSampleIndex
+					ToSegment = [int]$segment.OriginalSampleIndex
+					Kind = $transitionKind
+					DurationSeconds = [Math]::Round($transitionSeconds, 6)
+					VideoFilter = $xfadeTransition
+					AudioFilter = $(if ($hasSourceAudio) { "acrossfade" } else { "none" })
+				}
+				$currentDuration += [double]$segment.DurationSeconds - $transitionSeconds
+			} else {
+				$filterParts += "[$currentVideoLabel][v$index]concat=n=2:v=1:a=0[$outputVideoLabel]"
+				if ($hasSourceAudio) {
+					$filterParts += "[$currentAudioLabel][a$index]concat=n=2:v=0:a=1[$outputAudioLabel]"
+				}
+				$currentDuration += [double]$segment.DurationSeconds
+			}
+			$currentVideoLabel = $outputVideoLabel
+			$currentAudioLabel = $outputAudioLabel
+		}
 	}
+	$transitionRendering = if ($renderedTransitions.Count -gt 0) { "ffmpeg-xfade" } else { "hard-cut" }
 	$filterComplex = $filterParts -join ";"
 
 	$renderArguments = @(
@@ -488,7 +573,9 @@ try {
 		AudioPreserved = $hasSourceAudio
 		ManifestDriven = $manifestDriven
 		MontageManifestPath = $resolvedManifestPath
-		TransitionRendering = "hard-cut"
+		TransitionRendering = $transitionRendering
+		TransitionCount = $renderedTransitions.Count
+		RenderedTransitions = $renderedTransitions
 		ModelBacked = $modelBacked
 		InferenceChecked = $modelBacked
 		ScoringOwner = $scoringOwner

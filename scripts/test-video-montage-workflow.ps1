@@ -33,14 +33,14 @@ try {
 		kind = "ofxGgmlVideoMontageManifest"
 		version = 1
 		prompt = "use the exact planned clip windows"
-		durationSeconds = 1.5
+		durationSeconds = 1.25
 		options = [ordered]@{
-			transitionKind = "cut"
-			transitionSeconds = 0.0
+			transitionKind = "crossfade"
+			transitionSeconds = 0.25
 			handleSeconds = 0.0
 			beatBpm = 0.0
 			beatsPerBar = 4
-			overlapTransitions = $false
+			overlapTransitions = $true
 		}
 		references = @()
 		markers = @()
@@ -57,7 +57,7 @@ try {
 				handleInSeconds = 0.0
 				handleOutSeconds = 0.0
 				transitionIn = @{ kind = "cut"; durationSeconds = 0.0 }
-				transitionOut = @{ kind = "cut"; durationSeconds = 0.0 }
+				transitionOut = @{ kind = "crossfade"; durationSeconds = 0.25 }
 				tags = @("planned")
 				references = @()
 				frameSamples = @()
@@ -68,12 +68,12 @@ try {
 				label = "long closing"
 				sourceStartSeconds = 2.0
 				sourceEndSeconds = 3.0
-				timelineStartSeconds = 0.5
-				timelineEndSeconds = 1.5
+				timelineStartSeconds = 0.25
+				timelineEndSeconds = 1.25
 				durationSeconds = 1.0
 				handleInSeconds = 0.0
 				handleOutSeconds = 0.0
-				transitionIn = @{ kind = "cut"; durationSeconds = 0.0 }
+				transitionIn = @{ kind = "crossfade"; durationSeconds = 0.25 }
 				transitionOut = @{ kind = "cut"; durationSeconds = 0.0 }
 				tags = @("planned")
 				references = @()
@@ -93,6 +93,7 @@ try {
 	$manifestDryRun = ($manifestDryRunOutput -join [Environment]::NewLine) | ConvertFrom-Json
 	if (!$manifestDryRun.Ready -or !$manifestDryRun.ManifestDriven -or
 		$manifestDryRun.SampleCount -ne 2 -or $manifestDryRun.MaxOutputSegments -ne 2 -or
+		$manifestDryRun.TransitionRendering -ne "ffmpeg-xfade" -or $manifestDryRun.TransitionCount -ne 1 -or
 		[Math]::Abs([double]$manifestDryRun.SampleTimesSeconds[0] - 0.5) -gt 0.001 -or
 		[Math]::Abs([double]$manifestDryRun.SampleTimesSeconds[1] - 2.5) -gt 0.001) {
 		throw "Video montage workflow did not plan the exact manifest clip windows."
@@ -202,9 +203,16 @@ try {
 		-Json)
 	$manifestRender = ($manifestRenderOutput -join [Environment]::NewLine) | ConvertFrom-Json
 	if (!$manifestRender.Passed -or !$manifestRender.ManifestDriven -or
-		$manifestRender.SegmentCount -ne 2 -or $manifestRender.TransitionRendering -ne "hard-cut" -or
-		$manifestRender.OutputDurationSeconds -lt 1.4 -or $manifestRender.OutputDurationSeconds -gt 1.6) {
+		$manifestRender.SegmentCount -ne 2 -or $manifestRender.TransitionRendering -ne "ffmpeg-xfade" -or
+		$manifestRender.TransitionCount -ne 1 -or
+		$manifestRender.OutputDurationSeconds -lt 1.15 -or $manifestRender.OutputDurationSeconds -gt 1.35) {
 		throw "Video montage workflow did not render the manifest-driven timeline."
+	}
+	$renderedTransition = $manifestRender.RenderedTransitions | Select-Object -First 1
+	if ($renderedTransition.Kind -ne "crossfade" -or $renderedTransition.VideoFilter -ne "fade" -or
+		$renderedTransition.AudioFilter -ne "acrossfade" -or
+		[Math]::Abs([double]$renderedTransition.DurationSeconds - 0.25) -gt 0.001) {
+		throw "Video montage workflow did not exercise the requested video and audio crossfade."
 	}
 	if ([Math]::Abs([double]$manifestRender.Segments[0].SourceStartSeconds - 0.25) -gt 0.001 -or
 		[Math]::Abs([double]$manifestRender.Segments[0].DurationSeconds - 0.5) -gt 0.001 -or
@@ -213,7 +221,52 @@ try {
 		throw "Rendered segments did not preserve the manifest source starts and durations."
 	}
 
-	Write-Host "==> Video montage workflow produced sampled and manifest-driven validated MP4s"
+	$transitionCases = @(
+		@{ Kind = "dip"; VideoFilter = "fadeblack" },
+		@{ Kind = "wipe"; VideoFilter = "wipeleft" }
+	)
+	foreach ($transitionCase in $transitionCases) {
+		$manifest.options.transitionKind = $transitionCase.Kind
+		$manifest.segments[0].transitionOut.kind = $transitionCase.Kind
+		$manifest.segments[1].transitionIn.kind = $transitionCase.Kind
+		$manifest | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath $manifestPath -Encoding UTF8
+		$transitionOutputVideo = Join-Path $testRoot ("manifest-{0}.mp4" -f $transitionCase.Kind)
+		$transitionRenderOutput = @(& $workflowScript `
+			-Video $inputVideo `
+			-OutputPath $transitionOutputVideo `
+			-MontageManifestPath $manifestPath `
+			-SkipVision `
+			-Json)
+		$transitionRender = ($transitionRenderOutput -join [Environment]::NewLine) | ConvertFrom-Json
+		$transitionEvidence = $transitionRender.RenderedTransitions | Select-Object -First 1
+		if (!$transitionRender.Passed -or $transitionRender.TransitionRendering -ne "ffmpeg-xfade" -or
+			$transitionEvidence.Kind -ne $transitionCase.Kind -or
+			$transitionEvidence.VideoFilter -ne $transitionCase.VideoFilter -or
+			$transitionEvidence.AudioFilter -ne "acrossfade") {
+			throw "Video montage workflow did not exercise the $($transitionCase.Kind) transition."
+		}
+	}
+
+	$manifest.options.overlapTransitions = $false
+	$manifest.durationSeconds = 1.5
+	$manifest.segments[1].timelineStartSeconds = 0.5
+	$manifest.segments[1].timelineEndSeconds = 1.5
+	$manifest | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath $manifestPath -Encoding UTF8
+	$nonOverlapOutputVideo = Join-Path $testRoot "manifest-non-overlap.mp4"
+	$nonOverlapRenderOutput = @(& $workflowScript `
+		-Video $inputVideo `
+		-OutputPath $nonOverlapOutputVideo `
+		-MontageManifestPath $manifestPath `
+		-SkipVision `
+		-Json)
+	$nonOverlapRender = ($nonOverlapRenderOutput -join [Environment]::NewLine) | ConvertFrom-Json
+	if (!$nonOverlapRender.Passed -or $nonOverlapRender.TransitionRendering -ne "hard-cut" -or
+		$nonOverlapRender.TransitionCount -ne 0 -or
+		$nonOverlapRender.OutputDurationSeconds -lt 1.4 -or $nonOverlapRender.OutputDurationSeconds -gt 1.6) {
+		throw "Video montage workflow did not preserve the non-overlapping hard-cut behavior."
+	}
+
+	Write-Host "==> Video montage workflow produced sampled and transition-rendered manifest MP4s"
 } finally {
 	Remove-Item -LiteralPath $testRoot -Recurse -Force -ErrorAction SilentlyContinue
 }

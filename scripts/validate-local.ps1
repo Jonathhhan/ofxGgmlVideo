@@ -97,9 +97,10 @@ Assert-FileContains (Join-Path $montageExampleRoot "src\ofApp.cpp") "Browse Visi
 Assert-FileContains (Join-Path $montageExampleRoot "src\ofApp.cpp") "Render Vision-ranked MP4 \(local CUDA\)" "montage example local CUDA render path"
 Assert-FileContains (Join-Path $montageExampleRoot "src\ofApp.cpp") "Render Vision-ranked MP4 \(local CPU\)" "montage example local CPU render path"
 Assert-FileContains (Join-Path $montageExampleRoot "src\ofApp.cpp") "MontageManifestPath" "montage example manifest-driven render handoff"
-Assert-FileContains (Join-Path $montageExampleRoot "src\ofApp.cpp") "transition metadata currently renders as hard cuts" "montage example transition render disclosure"
+Assert-FileContains (Join-Path $montageExampleRoot "src\ofApp.cpp") "overlapping transitions come from the visible montage" "montage example transition render disclosure"
 Assert-FileContains (Join-Path $scriptRoot "run-video-montage-workflow.ps1") "VisionBackend" "montage workflow local backend selection"
 Assert-FileContains (Join-Path $scriptRoot "run-video-montage-workflow.ps1") "ManifestDriven" "montage workflow manifest-driven render evidence"
+Assert-FileContains (Join-Path $scriptRoot "run-video-montage-workflow.ps1") "Resolve-XfadeTransition" "montage workflow transition renderer"
 Assert-FileContains (Join-Path $scriptRoot "run-video-montage-workflow.ps1") "Assert-LocalVisionServerIdentity" "montage workflow local server identity check"
 Assert-FileContains (Join-Path $scriptRoot "run-video-montage-workflow.ps1") "start-local-vision-server.ps1" "montage workflow local Vision launcher handoff"
 
